@@ -7,6 +7,7 @@ import {
 
 describe("report date formatting", () => {
   it("formats a date string without timezone conversion", () => {
+    expect(formatReportDate("2026-10-01")).toBe("1 Oct 2026");
     expect(formatReportDate("2026-10-15")).toBe("15 Oct 2026");
     expect(formatReportAxisDate("2026-10-01")).toBe("1 Oct");
   });
