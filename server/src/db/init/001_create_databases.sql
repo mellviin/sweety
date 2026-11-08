@@ -1,0 +1,2 @@
+CREATE DATABASE sweety;
+CREATE DATABASE sweety_test;
