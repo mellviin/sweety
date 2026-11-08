@@ -3,15 +3,11 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import ErrorMessage from "../components/ErrorMessage.jsx";
 import FormField from "../components/FormField.jsx";
+import ReadingForm from "../components/ReadingForm.jsx";
 import Spinner from "../components/Spinner.jsx";
 import { api } from "../api/client.js";
 import { todayInTimezone } from "../utils/dates.js";
 import { getRequestError } from "../utils/requestErrors.js";
-import { slots } from "../utils/slots.js";
-
-function emptyForm(date) {
-  return { date, slot: "", value: "" };
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -19,10 +15,7 @@ export default function Dashboard() {
   const [readings, setReadings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-  const [form, setForm] = useState(() => emptyForm(todayInTimezone()));
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState(null);
+  const [editingReading, setEditingReading] = useState(null);
 
   const fetchReadings = useCallback(async (date) => {
     const response = await api.get("/readings", { params: { date } });
@@ -56,60 +49,14 @@ export default function Dashboard() {
     };
   }, [fetchReadings, selectedDate]);
 
-  function updateForm(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  }
-
   function startEditing(reading) {
-    setEditingId(reading.id);
-    setForm({
-      date: reading.date,
-      slot: reading.slot,
-      value: String(reading.value),
-    });
-    setFormError(null);
-  }
-
-  function cancelEditing() {
-    setEditingId(null);
-    setForm(emptyForm(selectedDate));
-    setFormError(null);
+    setEditingReading(reading);
   }
 
   function selectDate(event) {
     const date = event.target.value;
     setSelectedDate(date);
-    setEditingId(null);
-    setForm(emptyForm(date));
-    setFormError(null);
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-
-    try {
-      if (editingId === null) {
-        await api.post("/readings", form);
-      } else {
-        await api.put(`/readings/${editingId}`, form);
-      }
-
-      setEditingId(null);
-      setForm(emptyForm(selectedDate));
-      try {
-        setReadings(await fetchReadings(selectedDate));
-        setFetchError("");
-      } catch (error) {
-        setFetchError(getRequestError(error).message);
-      }
-    } catch (error) {
-      setFormError(getRequestError(error));
-    } finally {
-      setSubmitting(false);
-    }
+    setEditingReading(null);
   }
 
   async function deleteReading(reading) {
@@ -125,9 +72,6 @@ export default function Dashboard() {
       setFetchError(getRequestError(error).message);
     }
   }
-
-  const fieldError = (field) =>
-    formError?.field === field ? formError.message : "";
 
   return (
     <main className="page-shell">
@@ -199,71 +143,19 @@ export default function Dashboard() {
           </ul>
         )}
 
-        <form className="reading-form" onSubmit={handleSubmit} noValidate>
-          <h3>{editingId === null ? "Add a reading" : "Edit reading"}</h3>
-          <ErrorMessage>{formError?.message}</ErrorMessage>
-          <FormField
-            id="date"
-            label="Reading date"
-            type="date"
-            value={form.date}
-            onChange={updateForm}
-            error={fieldError("date")}
-            required
-          />
-          <div className="form-field">
-            <label htmlFor="slot">Time slot</label>
-            <select
-              id="slot"
-              name="slot"
-              value={form.slot}
-              onChange={updateForm}
-              aria-invalid={Boolean(fieldError("slot"))}
-              aria-describedby={fieldError("slot") ? "slot-error" : undefined}
-              required
-            >
-              <option value="">Select a time slot</option>
-              {slots.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-            {fieldError("slot") && (
-              <span className="field-error" id="slot-error">
-                {fieldError("slot")}
-              </span>
-            )}
-          </div>
-          <FormField
-            id="value"
-            label="Glucose value (mg/dl)"
-            type="number"
-            value={form.value}
-            onChange={updateForm}
-            error={fieldError("value")}
-            required
-          />
-          <div className="form-actions">
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={submitting}
-            >
-              {submitting ? "Saving…" : "Save"}
-            </button>
-            {editingId !== null && (
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={cancelEditing}
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+        <ReadingForm
+          selectedDate={selectedDate}
+          reading={editingReading}
+          onCancel={() => setEditingReading(null)}
+          onSaved={async () => {
+            try {
+              setReadings(await fetchReadings(selectedDate));
+              setFetchError("");
+            } catch (error) {
+              setFetchError(getRequestError(error).message);
+            }
+          }}
+        />
       </section>
     </main>
   );
