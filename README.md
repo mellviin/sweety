@@ -1,6 +1,6 @@
 # Sweety
 
-Sweety is a blood glucose tracker. The initial scaffold provides an Express API and PostgreSQL database foundation.
+Sweety is a blood glucose tracker with a React web client, an Express API, and a PostgreSQL database.
 
 ## Local setup
 
@@ -15,9 +15,9 @@ Sweety is a blood glucose tracker. The initial scaffold provides an Express API 
    ```
 
 4. Check `http://localhost:3000/health`; it should return `{"status":"ok"}`.
-5. In `client`, run `npm install` and `npm run dev` to start the Vite frontend.
+5. In `client`, run `npm install` and `npm run dev` to start the Vite frontend at `http://localhost:5173`. The development server proxies `/api` requests to the API on port `3000`; set `VITE_API_PROXY_TARGET` in `client/.env` to change the target.
 
-The authentication API provides `POST /auth/register`, `POST /auth/login`, and protected `GET /auth/me`. Both registration and login return a bearer token and a safe user object. Protected readings endpoints support `POST /readings`, paginated/filterable `GET /readings`, `GET /readings/:id`, `PUT /readings/:id`, and `DELETE /readings/:id`. Send the token in `Authorization: Bearer <token>`.
+The web client provides account registration and login, protected Dashboard and Reports pages, and logout. It restores an existing session by validating the saved token with `GET /auth/me`. The authentication API provides `POST /auth/register`, `POST /auth/login`, and protected `GET /auth/me`. Both registration and login return a bearer token and a safe user object. Protected readings endpoints support `POST /readings`, paginated/filterable `GET /readings`, `GET /readings/:id`, `PUT /readings/:id`, and `DELETE /readings/:id`. Send the token in `Authorization: Bearer <token>`.
 
 Protected reports are available at `GET /reports/daily?date=YYYY-MM-DD`, `GET /reports/month-to-date?date=YYYY-MM-DD`, and `GET /reports/monthly?date=YYYY-MM-DD`. Each report is scoped to the logged-in user.
 
@@ -29,7 +29,7 @@ Use [server/requests.http](./server/requests.http) with the VS Code REST Client 
 
 The Jest integration tests use `TEST_DATABASE_URL` and apply the schema to that database. Set it in `.env` before running tests; test records are truncated between tests.
 
-Run tests and lint from `server` with `npm test` and `npm run lint`; build the frontend from `client` with `npm run build`.
+Run backend tests and lint from `server` with `npm test` and `npm run lint`. From `client`, run `npm test`, `npm run lint`, and `npm run build` to test, lint, and build the frontend.
 
 ## Notes
 

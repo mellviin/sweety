@@ -11,3 +11,5 @@
 - Reading validation checks the four-per-date maximum before checking for a duplicate slot, so a fifth reading reports the daily limit even when its slot also exists.
 - Demo seed readings are deterministic and span the 21 days ending yesterday, plus a reading on the last day of the previous month relative to yesterday when that day is outside the 21-day range.
 - The authentication rate limit defaults to 20 requests per IP per 15 minutes and is disabled when `NODE_ENV=test`.
+- The React client uses the Vite development proxy at `/api`, which strips that prefix and forwards requests to `http://localhost:3000` by default.
+- The client persists the JWT in browser local storage so a logged-in session can be restored after a page reload.
