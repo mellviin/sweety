@@ -14,3 +14,4 @@
 - The React client uses the Vite development proxy at `/api`, which strips that prefix and forwards requests to `http://localhost:3000` by default.
 - The client persists the JWT in browser local storage so a logged-in session can be restored after a page reload.
 - The Dashboard date picker defaults to the configured application timezone's current date; changing it also resets the reading form and exits edit mode to avoid editing an item from a different selected day.
+- The Reports chart plots each reading as a point in date/slot order and includes only readings from the selected calendar month's first day through the selected date.
