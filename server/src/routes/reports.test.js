@@ -184,6 +184,55 @@ describe("GET /reports/monthly", () => {
   });
 });
 
+describe("GET /reports/chart", () => {
+  test("returns selected-month readings through the requested date in date and slot order", async () => {
+    await addReading(userAId, "2026-10-01", slots[2], 130);
+    await addReading(userAId, "2026-10-15", slots[3], 150);
+    await addReading(userAId, "2026-10-15", slots[0], 95);
+    await addReading(userAId, "2026-10-16", slots[1], 120);
+    await addReading(userBId, "2026-10-15", slots[1], 450);
+
+    const response = await getReport("/reports/chart?date=2026-10-15");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([
+      { date: "2026-10-01", slot: slots[2], value: 130 },
+      { date: "2026-10-15", slot: slots[0], value: 95 },
+      { date: "2026-10-15", slot: slots[3], value: 150 },
+    ]);
+  });
+
+  test.each([
+    ["missing", ""],
+    ["invalid calendar date", "2026-02-30"],
+  ])("rejects a %s chart date", async (_scenario, date) => {
+    const query = date ? `?date=${date}` : "";
+    const response = await getReport(`/reports/chart${query}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: { field: "date", message: "Please enter a valid date." },
+    });
+  });
+
+  test("rejects a future chart date", async () => {
+    const response = await getReport("/reports/chart?date=2099-12-31");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: { field: "date", message: "Date cannot be in the future." },
+    });
+  });
+
+  test("requires authentication", async () => {
+    const response = await request(app)
+      .get("/reports/chart?date=2026-10-15");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.message).toBe("Please log in to continue.");
+  });
+});
+
 describe("report validation and ownership", () => {
   test.each([
     ["missing", ""],
