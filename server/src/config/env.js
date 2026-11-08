@@ -20,3 +20,9 @@ export const config = {
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
   appTimezone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
 };
+
+export function assertJwtSecret() {
+  if (!config.jwtSecret) {
+    throw new Error("JWT_SECRET must be set before the API can start.");
+  }
+}

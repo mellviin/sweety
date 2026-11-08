@@ -8,21 +8,30 @@ export function authenticateToken(request, response, next) {
     : null;
 
   if (!token) {
-    return response.status(401).json({
-      error: { field: null, message: "Authentication required" },
-    });
+    return sendLoginRequired(response);
   }
 
   try {
-    request.user = jwt.verify(token, config.jwtSecret);
+    const payload = jwt.verify(token, config.jwtSecret);
+    const userId = Number(payload.sub);
+
+    if (!Number.isSafeInteger(userId) || userId < 1) {
+      return sendLoginRequired(response);
+    }
+
+    request.user = { id: userId };
     return next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
-      return response.status(401).json({
-        error: { field: null, message: "Invalid or expired token" },
-      });
+    if (error instanceof jwt.JsonWebTokenError) {
+      return sendLoginRequired(response);
     }
 
     return next(error);
   }
+}
+
+function sendLoginRequired(response) {
+  return response.status(401).json({
+    error: { field: null, message: "Please log in to continue." },
+  });
 }
