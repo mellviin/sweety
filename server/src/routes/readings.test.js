@@ -42,6 +42,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  await pool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   await pool.end();
 });
 
