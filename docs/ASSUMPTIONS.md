@@ -7,3 +7,4 @@
 - `previousMonthRange(date)` returns inclusive `startDate` and `endDate` strings for the month preceding the date's month.
 - Docker Compose is for local development and uses PostgreSQL's trust authentication; do not expose this service outside a trusted local environment.
 - No initial application data is required, so the seed script currently completes with a message and makes no database changes.
+- Passwords use bcrypt with 12 rounds, and authentication integration tests use only the database configured by `TEST_DATABASE_URL`.
