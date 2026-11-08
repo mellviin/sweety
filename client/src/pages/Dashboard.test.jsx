@@ -157,6 +157,11 @@ describe("Dashboard readings", () => {
     renderDashboard();
 
     await screen.findByText("No readings for this date yet.");
+    await user.selectOptions(
+      screen.getByLabelText("Time slot"),
+      "AFTER_BREAKFAST",
+    );
+    await user.type(screen.getByLabelText("Glucose value (mg/dl)"), "120");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
