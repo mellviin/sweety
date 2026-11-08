@@ -1,0 +1,154 @@
+@baseUrl = http://localhost:3000
+@reportDate = 2026-11-07
+
+### Register a user
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "REST Client User",
+  "email": "rest-client@sweety.test",
+  "password": "RestClient@123"
+}
+
+### Log in as the newly registered user
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{register.response.body.user.email}}",
+  "password": "RestClient@123"
+}
+
+### Create a reading (use a date no later than today)
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "MORNING_FASTING",
+  "value": 108
+}
+
+### Validation: value missing
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "AFTER_BREAKFAST"
+}
+
+### Validation: value out of range
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "AFTER_BREAKFAST",
+  "value": 39
+}
+
+### Validation: slot missing
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "value": 120
+}
+
+### Validation: invalid date
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "2026-02-30",
+  "slot": "AFTER_BREAKFAST",
+  "value": 120
+}
+
+### Validation: future date
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "2099-12-31",
+  "slot": "AFTER_BREAKFAST",
+  "value": 120
+}
+
+### Validation: duplicate slot (run after Create a reading)
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "MORNING_FASTING",
+  "value": 120
+}
+
+### Fill the other three slots
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "AFTER_BREAKFAST",
+  "value": 130
+}
+
+###
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "AFTER_LUNCH",
+  "value": 140
+}
+
+###
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "AFTER_DINNER",
+  "value": 150
+}
+
+### Validation: daily maximum (run after filling all four slots)
+POST {{baseUrl}}/readings
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "date": "{{reportDate}}",
+  "slot": "MORNING_FASTING",
+  "value": 160
+}
+
+### Daily report
+GET {{baseUrl}}/reports/daily?date={{reportDate}}
+Authorization: Bearer {{login.response.body.token}}
+
+### Month-to-date report
+GET {{baseUrl}}/reports/month-to-date?date={{reportDate}}
+Authorization: Bearer {{login.response.body.token}}
+
+### Previous-month report
+GET {{baseUrl}}/reports/monthly?date={{reportDate}}
+Authorization: Bearer {{login.response.body.token}}

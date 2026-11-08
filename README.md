@@ -21,6 +21,12 @@ The authentication API provides `POST /auth/register`, `POST /auth/login`, and p
 
 Protected reports are available at `GET /reports/daily?date=YYYY-MM-DD`, `GET /reports/month-to-date?date=YYYY-MM-DD`, and `GET /reports/monthly?date=YYYY-MM-DD`. Each report is scoped to the logged-in user.
 
+The authentication endpoints are limited by `AUTH_RATE_LIMIT_MAX` requests in `AUTH_RATE_LIMIT_WINDOW_MS` milliseconds per IP (20 requests per 15 minutes by default). Rate limiting is disabled in test mode.
+
+Run `npm run seed` from `server` to create or refresh the deterministic demo readings for `demo@sweety.test` / `Demo@1234`. It applies migrations first and resets only that demo user's readings.
+
+Use [server/requests.http](./server/requests.http) with the VS Code REST Client extension to exercise registration, login, readings validation, and reports.
+
 The Jest integration tests use `TEST_DATABASE_URL` and apply the schema to that database. Set it in `.env` before running tests; test records are truncated between tests.
 
 Run tests and lint from `server` with `npm test` and `npm run lint`; build the frontend from `client` with `npm run build`.
