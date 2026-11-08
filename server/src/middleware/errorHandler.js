@@ -6,11 +6,15 @@ export function notFoundHandler(_request, _response, next) {
 
 export function errorHandler(error, _request, response, _next) {
   const status = Number.isInteger(error.status) ? error.status : 500;
+  const errorBody = {
+    message: status === 500 ? "Internal server error" : error.message,
+  };
+
+  if (!error.omitField) {
+    errorBody.field = error.field ?? null;
+  }
 
   response.status(status).json({
-    error: {
-      field: error.field ?? null,
-      message: status === 500 ? "Internal server error" : error.message,
-    },
+    error: errorBody,
   });
 }

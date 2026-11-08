@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { config } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import authRouter from "./routes/auth.js";
+import readingsRouter from "./routes/readings.js";
 
 export function createApp() {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp() {
   });
 
   app.use("/auth", authRouter);
+  app.use("/readings", readingsRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);
 
