@@ -8,3 +8,4 @@
 - Docker Compose is for local development and uses PostgreSQL's trust authentication; do not expose this service outside a trusted local environment.
 - No initial application data is required, so the seed script currently completes with a message and makes no database changes.
 - Passwords use bcrypt with 12 rounds, and authentication integration tests use only the database configured by `TEST_DATABASE_URL`.
+- Reading validation checks the four-per-date maximum before checking for a duplicate slot, so a fifth reading reports the daily limit even when its slot also exists.
