@@ -55,6 +55,23 @@ export async function getMonthlyReport(userId, query) {
   return getSummary(userId, range.startDate, range.endDate);
 }
 
+export async function getChartReadings(userId, query) {
+  const date = validateReportDate(query.date);
+  const result = await pool.query(
+    `SELECT reading_date AS date, slot, value
+     FROM readings
+     WHERE user_id = $1 AND reading_date >= $2 AND reading_date <= $3
+     ORDER BY reading_date, ${slotOrder}`,
+    [userId, firstOfMonth(date), date],
+  );
+
+  return result.rows.map((row) => ({
+    date: row.date,
+    slot: row.slot,
+    value: row.value,
+  }));
+}
+
 function validateReportDate(date) {
   if (!isValidDateString(date)) {
     throw reportValidationError("Please enter a valid date.");
