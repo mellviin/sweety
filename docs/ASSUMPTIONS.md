@@ -13,3 +13,4 @@
 - The authentication rate limit defaults to 20 requests per IP per 15 minutes and is disabled when `NODE_ENV=test`.
 - The React client uses the Vite development proxy at `/api`, which strips that prefix and forwards requests to `http://localhost:3000` by default.
 - The client persists the JWT in browser local storage so a logged-in session can be restored after a page reload.
+- The Dashboard date picker defaults to the configured application timezone's current date; changing it also resets the reading form and exits edit mode to avoid editing an item from a different selected day.
