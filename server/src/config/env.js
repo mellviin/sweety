@@ -19,6 +19,10 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
   appTimezone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
+  authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 20),
+  authRateLimitWindowMs: Number(
+    process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000,
+  ),
 };
 
 export function assertJwtSecret() {

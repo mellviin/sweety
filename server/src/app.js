@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import authRouter from "./routes/auth.js";
 import reportsRouter from "./routes/reports.js";
 import readingsRouter from "./routes/readings.js";
+import { authRateLimiter } from "./middleware/rateLimit.js";
 
 export function createApp() {
   const app = express();
@@ -18,7 +19,7 @@ export function createApp() {
     response.json({ status: "ok" });
   });
 
-  app.use("/auth", authRouter);
+  app.use("/auth", authRateLimiter, authRouter);
   app.use("/readings", readingsRouter);
   app.use("/reports", reportsRouter);
   app.use(notFoundHandler);

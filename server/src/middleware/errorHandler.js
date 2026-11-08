@@ -5,13 +5,28 @@ export function notFoundHandler(_request, _response, next) {
 }
 
 export function errorHandler(error, _request, response, _next) {
-  const status = Number.isInteger(error.status) ? error.status : 500;
+  const isMalformedJson = error.type === "entity.parse.failed";
+  const status = isMalformedJson
+    ? 400
+    : Number.isInteger(error.status)
+      ? error.status
+      : 500;
+  const message = isMalformedJson
+    ? "Invalid request body."
+    : status === 500
+      ? "Internal server error"
+      : error.message;
+
+  if (status >= 500) {
+    console.error("Unexpected request error:", error);
+  }
+
   const errorBody = {
-    message: status === 500 ? "Internal server error" : error.message,
+    message,
   };
 
   if (!error.omitField) {
-    errorBody.field = error.field ?? null;
+    errorBody.field = status >= 500 ? null : error.field ?? null;
   }
 
   response.status(status).json({
