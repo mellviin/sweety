@@ -37,9 +37,15 @@ describe("authentication screens", () => {
     localStorage.clear();
     apiMocks.get.mockReset();
     apiMocks.post.mockReset();
-    apiMocks.get.mockResolvedValue({
-      data: { user: { id: 1, name: "Sweety User", email: "sweety@example.com" } },
-    });
+    apiMocks.get.mockImplementation((path) => (
+      path === "/auth/me"
+        ? {
+          data: {
+            user: { id: 1, name: "Sweety User", email: "sweety@example.com" },
+          },
+        }
+        : { data: { data: [] } }
+    ));
   });
 
   afterEach(() => {
