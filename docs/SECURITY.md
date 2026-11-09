@@ -15,6 +15,21 @@
 | Sensitive data leakage or forged log lines, and lack of security-event auditability | Emit JSON logs from a strict field allow-list, sanitize control characters and mask emails, attach a validated request ID, and persist limited auth/rate-limit events in an app-role INSERT/SELECT-only table. | `server/src/utils/logger.js`, `server/src/middleware/requestContext.js`, `server/src/services/securityEventService.js`, `server/src/db/migrations/004_security_events.sql` | `server/src/app.test.js`, `server/src/routes/auth.test.js`, `server/src/db/roles.test.js` |
 | Vulnerable dependencies, leaked secrets, and unreviewed code changes | Run lockfile-based installs, high/critical npm audits, Gitleaks history scanning, Trivy filesystem scanning, and CodeQL; configure weekly dependency updates and least-privilege workflow permissions. | `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.github/dependabot.yml`, `server/package-lock.json`, `client/package-lock.json` | CI audit, Gitleaks, Trivy, and CodeQL jobs |
 
+## OWASP Top 10 (2021) coverage
+
+| Category | What Sweety does | Files | Tests / evidence |
+|---|---|---|---|
+| A01 Broken Access Control | Requires authenticated access to private routes, derives ownership from the verified token, returns 404 for another user's readings, and limits the app DB role to required data operations. | `server/src/middleware/auth.js`, `server/src/services/readingService.js`, `server/src/services/reportService.js`, `server/src/db/init/001_create_databases.sql`, `server/src/db/migrations/002_hardening.sql` | `server/src/routes/readings.test.js`, `server/src/routes/reports.test.js`, `server/src/db/roles.test.js` |
+| A02 Cryptographic Failures | Stores passwords with bcrypt cost 12 and protects JWTs with HS256, a required 32-character minimum secret, issuer, audience, and expiry. Production TLS must be provided by the deployment. | `server/src/services/authService.js`, `server/src/services/passwordPolicy.js`, `server/src/config/env.js` | `server/src/routes/auth.test.js`, `server/src/db/security-config.test.js` |
+| A03 Injection | Rejects malformed and unknown inputs, uses parameterized SQL, checks application SQL for interpolation, and renders user text through React escaping rather than dangerous HTML insertion. | `server/src/middleware/strictFields.js`, `server/src/services/readingService.js`, `server/src/services/reportService.js`, `server/src/security/sqlQuerySafety.test.js`, `client/src` | `server/src/routes/readings.test.js`, `server/src/routes/auth.test.js`, `server/src/security/sqlQuerySafety.test.js`, `client/src/App.test.jsx` |
+| A04 Insecure Design | Applies rate limits, enforces reading limits and uniqueness, scopes reports by user, and uses generic login failures with a dummy password comparison for unknown accounts. | `server/src/middleware/rateLimit.js`, `server/src/services/readingService.js`, `server/src/services/authService.js`, `server/src/services/reportService.js` | `server/src/routes/auth.test.js`, `server/src/routes/readings.test.js`, `server/src/routes/reports.test.js` |
+| A05 Security Misconfiguration | Sets API security headers and exact-origin CORS, validates database/JWT configuration, binds the development database to localhost, and documents a production CSP response header. | `server/src/app.js`, `server/src/config/env.js`, `docker-compose.yml`, `client/index.html`, `docs/SECURITY.md` | `server/src/app.test.js`, `server/src/db/security-config.test.js` |
+| A06 Vulnerable Components | Uses committed lockfiles and `npm ci`; CI runs high-severity npm audits and Trivy, while Dependabot proposes weekly dependency updates. | `server/package-lock.json`, `client/package-lock.json`, `.github/workflows/ci.yml`, `.github/dependabot.yml` | CI server/client audit and Trivy jobs |
+| A07 Identification and Authentication Failures | Enforces password policy, compares a dummy hash for unknown users, validates JWT algorithm/claims, invalidates tokens on logout/password change, and clears client tokens on 401/logout. | `server/src/services/authService.js`, `server/src/services/passwordPolicy.js`, `server/src/middleware/auth.js`, `client/src/api/client.js`, `client/src/context/AuthContext.jsx` | `server/src/routes/auth.test.js`, `client/src/api/client.test.js`, `client/src/App.test.jsx` |
+| A08 Software and Data Integrity Failures | Tracks ordered database migrations, applies transactional data updates, uses lockfile-based CI installs, scans the repository and filesystem, and runs CodeQL. GitHub Actions use full version tags rather than immutable SHAs. | `server/src/db/migrate.js`, `server/src/db/migrations`, `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.gitleaksignore` | `server/src/db/migrate.test.js`, CI Gitleaks/Trivy/CodeQL jobs |
+| A09 Security Logging and Monitoring Failures | Adds request IDs, emits structured allow-listed logs with sanitized/masked values, and stores limited security events without credentials. | `server/src/utils/logger.js`, `server/src/middleware/requestContext.js`, `server/src/services/securityEventService.js`, `server/src/db/migrations/004_security_events.sql` | `server/src/app.test.js`, `server/src/routes/auth.test.js`, `server/src/db/roles.test.js` |
+| A10 Server-Side Request Forgery (SSRF) | Not applicable to the current API: it has no feature that fetches or proxies a user-supplied URL and no outbound HTTP client calls. Reassess if URL fetching or webhook features are added. | `server/src` | No SSRF-specific test; confirm the absence of outbound request code during review. |
+
 ### Browser security headers
 
 The production Vite build inserts a CSP meta fallback; development removes it so Vite HMR works. Meta policies cannot enforce `frame-ancestors`, so configure this CSP as a real response header at the production web server/CDN. With a same-origin `/api` reverse proxy, an example Nginx header is:
@@ -25,19 +40,22 @@ add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style
 
 If the API is served from a separate origin, add only that exact HTTPS origin to `connect-src` in both the response header and the CSP meta fallback. Keep `frame-ancestors` in the response header; browsers ignore it in meta policies.
 
-## Known limitations
+## Known limitations / what I'd do next
 
 - Example passwords and connection strings are placeholders; operators must supply strong distinct values and protect real `.env` files.
 - Existing containers retain their old port binding until recreated; the initialization script provisions roles only for a new data volume.
 - Recreating the data volume applies changed role provisioning but permanently deletes local database data.
-- PostgreSQL grants and constraints are not a substitute for production network isolation, backups, or managed secret storage.
+- PostgreSQL grants and constraints do not provide backups or encryption at rest; configure and test both for production data.
 - Failed-login counters are in-process and are not shared across API instances or preserved across restarts.
 - Registration deliberately retains its assignment-required 409 duplicate-email response, which reveals whether an email is registered; mitigating this enumeration channel would require changing that agreed API behavior.
 - Request schemas reject unknown body and query fields with 400; clients must not send extra fields such as `user_id` or `userId`.
 - The bearer token remains accessible to same-origin JavaScript in `sessionStorage`; session storage reduces persistence but does not prevent theft by a successful XSS.
 - Security-event records include IP addresses and user-agent strings; establish and enforce an operational retention period appropriate to the deployment.
 - Full-history Gitleaks scanning found one possible JWT-secret-like value in `.env.example` at commit `838275bb09896574545ec6b4b4a1dac7b3829275`. The exact finding is baselined in `.gitleaksignore`; history was not rewritten. Treat any credential that may have reused that value as exposed and rotate it.
+- Login/session security does not yet include MFA, email verification, password reset, or refresh tokens.
+- CI actions are pinned to full version tags, not immutable commit SHAs; tags can theoretically be moved.
+- The app does not itself enforce TLS or provide a WAF/reverse proxy; production ingress must terminate TLS and provide network-level protections.
+- The repository has no production secrets-manager integration; operators must provision and rotate secrets safely.
+- No professional penetration test has been performed; automated tests and scanners are not a substitute.
 
-## What I'd do next
-
-- Consider moving bearer tokens to `HttpOnly`, `Secure`, `SameSite` cookies. This is stronger against JavaScript token theft, but requires coordinated server/client cookie handling, CSRF protection (for example a CSRF token and origin checks), and explicit credentialed CORS with a non-wildcard origin and `Access-Control-Allow-Credentials`.
+Next steps are to add MFA, email verification and a secure password-reset flow; evaluate refresh-token rotation; and move bearer sessions to `HttpOnly`, `Secure`, `SameSite` cookies. Cookie sessions require CSRF protection (such as CSRF tokens and origin checks), coordinated server/client handling, and credentialed CORS configured for explicit trusted origins. Production deployment should add a WAF and TLS-terminating reverse proxy, a secrets manager, encrypted and tested backups, and a professional penetration test.

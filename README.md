@@ -11,6 +11,10 @@ Sweety is a blood glucose tracker for recording daily readings and reviewing tre
 - Explore readings for the selected month in a line chart.
 - Use a deterministic demo seed account and a PostgreSQL Docker Compose service.
 
+## Security
+
+Sweety's security controls, test evidence, deployment guidance, and known limitations are documented in [docs/SECURITY.md](./docs/SECURITY.md).
+
 ## Tech stack
 
 - Node.js ES modules and Express
@@ -284,7 +288,7 @@ Screenshots are not included yet. Add images under `docs/screenshots/` and link 
 
 ### What I would improve with more time
 
-- Replace local-storage bearer tokens with HTTP-only, secure cookies and a refresh-token rotation/session-revocation design.
+- Replace `sessionStorage` bearer tokens with `HttpOnly`, secure cookie sessions and a refresh-token rotation/session-revocation design, with CSRF protection.
 - Add browser-based end-to-end flows and accessibility automation, including broader screen-reader and keyboard checks.
 - Add deployment-specific secret management, observability, database backup guidance, and CI coverage for supported Node/PostgreSQL versions.
 - Add report caching only after measuring query patterns and defining cache invalidation for reading changes.
