@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import app from "./app.js";
 import {
   assertDatabaseUrl,
@@ -16,7 +17,11 @@ try {
 }
 
 if (configurationValid) {
-  app.listen(config.port, () => {
+  const server = createServer(app);
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 10_000;
+  server.keepAliveTimeout = 5_000;
+  server.listen(config.port, () => {
     console.info(`Sweety API listening on port ${config.port}`);
   });
 }

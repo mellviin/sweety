@@ -1,7 +1,7 @@
 import express from "express";
 import { jest } from "@jest/globals";
 import request from "supertest";
-import app from "./app.js";
+import app, { createApp } from "./app.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 describe("API app", () => {
@@ -10,6 +10,69 @@ describe("API app", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: "ok" });
+  });
+
+  test("sets security headers and removes X-Powered-By", async () => {
+    const response = await request(app).get("/health");
+
+    expect(response.headers["content-security-policy"]).toBe(
+      "default-src 'self';script-src 'self';object-src 'none';"
+        + "frame-ancestors 'none';base-uri 'self'",
+    );
+    expect(response.headers["referrer-policy"]).toBe("no-referrer");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["cross-origin-opener-policy"]).toBe("same-origin");
+    expect(response.headers["cross-origin-resource-policy"]).toBe("same-origin");
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["strict-transport-security"]).toBeUndefined();
+  });
+
+  test("enables HSTS only when created in production mode", async () => {
+    const previousEnvironment = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      const response = await request(createApp()).get("/health");
+      expect(response.headers["strict-transport-security"]).toContain(
+        "max-age=",
+      );
+    } finally {
+      process.env.NODE_ENV = previousEnvironment;
+    }
+  });
+
+  test("does not grant CORS access to a foreign origin", async () => {
+    const response = await request(app)
+      .get("/health")
+      .set("Origin", "https://attacker.example");
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  test("only allows the configured CORS methods and headers", async () => {
+    const response = await request(app)
+      .options("/readings")
+      .set("Origin", "http://localhost:5173")
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "authorization,content-type");
+
+    expect(response.headers["access-control-allow-origin"])
+      .toBe("http://localhost:5173");
+    expect(response.headers["access-control-allow-methods"])
+      .toBe("GET,POST,PUT,DELETE");
+    expect(response.headers["access-control-allow-headers"])
+      .toBe("Authorization,Content-Type");
+  });
+
+  test("does not cache auth, reading, or report responses", async () => {
+    const responses = await Promise.all([
+      request(app).get("/auth/me"),
+      request(app).get("/readings"),
+      request(app).get("/reports/daily"),
+    ]);
+
+    expect(responses.map((response) => response.headers["cache-control"]))
+      .toEqual(["no-store", "no-store", "no-store"]);
   });
 
   test("unknown routes use the standard error shape", async () => {
@@ -32,6 +95,44 @@ describe("API app", () => {
       error: { field: null, message: "Invalid request body." },
     });
   });
+
+  test("an 11KB JSON body is rejected", async () => {
+    const response = await request(app)
+      .post("/auth/register")
+      .send({ name: "A".repeat(11 * 1024) });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error.field).toBeNull();
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  test("form-encoded bodies on JSON routes are rejected", async () => {
+    const response = await request(app)
+      .post("/auth/login")
+      .type("form")
+      .send({ email: "user@example.test", password: "password" });
+
+    expect(response.status).toBe(415);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  test.each(["__proto__", "constructor", "prototype"])(
+    "request bodies with %s keys are rejected",
+    async (key) => {
+    const response = await request(app)
+      .post("/auth/register")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        name: "User",
+        [key]: { admin: true },
+      }));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: { field: null, message: "Invalid request body." },
+    });
+    },
+  );
 
   test("unexpected production errors are logged without exposing details", async () => {
     const testApp = express();
@@ -56,6 +157,36 @@ describe("API app", () => {
     } finally {
       process.env.NODE_ENV = previousEnvironment;
       consoleError.mockRestore();
+    }
+  });
+
+  test("production errors never expose SQL, library details, or stacks", async () => {
+    const testApp = express();
+    const previousEnvironment = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    testApp.get("/failure", () => {
+      const error = new Error(
+        "QueryFailedError: SELECT * FROM users; at node_modules/pg/client.js",
+      );
+      error.stack = "private stack trace";
+      throw error;
+    });
+    testApp.use(errorHandler);
+
+    try {
+      const response = await request(testApp).get("/failure");
+      const serialized = JSON.stringify(response.body);
+
+      expect(response.status).toBe(500);
+      expect(serialized).toBe(
+        '{"error":{"message":"Internal server error","field":null}}',
+      );
+      expect(serialized).not.toContain("SELECT");
+      expect(serialized).not.toContain("QueryFailedError");
+      expect(serialized).not.toContain("node_modules");
+      expect(serialized).not.toContain("private stack trace");
+    } finally {
+      process.env.NODE_ENV = previousEnvironment;
     }
   });
 

@@ -112,6 +112,7 @@ Do not use the example JWT value outside local development. Replace it with a st
 | `NODE_ENV` | Node runtime mode; tests set this to `test`, which disables auth rate limiting and selects `TEST_DATABASE_URL`. | `development` |
 | `PORT` | Express listening port. | `3000` |
 | `CLIENT_URL` | Allowed browser origin for CORS. | `http://localhost:5173` |
+| `TRUST_PROXY` | Express trusted proxy setting for client IP detection and rate limiting. Accepts `true`, `false` (default), a hop count, or a comma-separated proxy/IP list. | `false` |
 | `APP_TIMEZONE` | IANA timezone used for the app's current-date and future-date checks. | `Asia/Kolkata` |
 | `AUTH_RATE_LIMIT_MAX` | Maximum auth requests per IP during the rate-limit window. | `20` |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | Auth rate-limit window in milliseconds. | `900000` (15 minutes) |
@@ -310,4 +311,5 @@ Screenshots are not included yet. Add images under `docs/screenshots/` and link 
 
 - Never commit `.env` files or production credentials. Every example secret/password is a placeholder.
 - Docker Compose is for local development; its database port is bound to localhost. Use a managed secrets mechanism and network controls for deployments.
+- Set `TRUST_PROXY` only to match the trusted reverse proxy topology. Leave it unset/off when the API is directly reachable; trusting arbitrary forwarded headers can undermine IP-based rate limiting.
 - Jest truncates test tables. Set `TEST_DATABASE_URL` to the dedicated test database, never to a database with data you need.

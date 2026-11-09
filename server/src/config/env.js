@@ -4,6 +4,20 @@ import { fileURLToPath } from "node:url";
 
 const configDirectory = dirname(fileURLToPath(import.meta.url));
 
+function parseTrustProxy(value) {
+  if (!value || value.toLowerCase() === "false") {
+    return false;
+  }
+  if (value.toLowerCase() === "true") {
+    return true;
+  }
+
+  const hopCount = Number(value);
+  return Number.isInteger(hopCount) && hopCount >= 0
+    ? hopCount
+    : value.split(",").map((entry) => entry.trim());
+}
+
 dotenv.config({
   path: [
     resolve(configDirectory, "../../.env"),
@@ -18,6 +32,7 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",
   port: Number(process.env.PORT ?? 3000),
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   appTimezone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 20),
   authRateLimitWindowMs: Number(

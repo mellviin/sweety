@@ -7,6 +7,7 @@
 | Invalid or duplicate glucose records and non-cascading user deletion | Enforce non-null, value/slot checks, case-insensitive email and reading uniqueness, and cascading foreign key. | `server/src/db/migrations/002_hardening.sql` | `server/src/db/roles.test.js` |
 | Unbounded database resource use or indefinitely slow statements | Cap pool size and set idle, connection, and statement timeouts. | `server/src/db/pool.js` | Server test suite |
 | API runtime holding schema-altering credentials or failing on absent migration URL | Create the migration pool lazily and restrict it to migration, seed, and test flows; validate the app database URL with a clear startup error. | `server/src/db/pool.js`, `server/src/server.js`, `server/src/db/migrate.js` | `server/src/db/security-config.test.js`, `server/src/db/roles.test.js` |
+| Browser injection, cross-origin requests, cached sensitive responses, malformed/oversized or polluted request bodies, and slow connections | Add strict Helmet headers, exact-origin CORS, no-store route headers, bounded JSON parsing, body validation, HPP, and HTTP server timeouts. | `server/src/app.js`, `server/src/middleware/httpHardening.js`, `server/src/middleware/errorHandler.js`, `server/src/server.js` | `server/src/app.test.js` |
 
 ## Known limitations
 
