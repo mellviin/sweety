@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -16,11 +17,15 @@ import {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => getStoredToken());
+  const startupToken = useRef(getStoredToken());
+  const authVersion = useRef(0);
+  const restoreRequest = useRef(null);
+  const [token, setToken] = useState(startupToken.current);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(() => {
+    authVersion.current += 1;
     clearStoredToken();
     setToken(null);
     setUser(null);
@@ -28,6 +33,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      authVersion.current += 1;
       setToken(null);
       setUser(null);
     };
@@ -39,37 +45,48 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function restoreSession() {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await api.get("/auth/me");
-        if (active) {
-          setUser(response.data.user);
-        }
-      } catch {
-        if (active) {
-          logout();
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
+    const tokenAtStartup = startupToken.current;
+    if (!tokenAtStartup) {
+      setLoading(false);
+      return undefined;
     }
 
-    restoreSession();
+    const versionAtStart = authVersion.current;
+    restoreRequest.current ??= Promise.resolve(api.get("/auth/me"));
+    let ignore = false;
+
+    restoreRequest.current
+      .then((response) => {
+        if (
+          !ignore
+          && authVersion.current === versionAtStart
+          && getStoredToken() === tokenAtStartup
+        ) {
+          setUser(response.data.user);
+        }
+      })
+      .catch(() => {
+        if (
+          !ignore
+          && authVersion.current === versionAtStart
+          && getStoredToken() === tokenAtStartup
+        ) {
+          logout();
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+
     return () => {
-      active = false;
+      ignore = true;
     };
-  }, [logout, token]);
+  }, [logout]);
 
   const acceptCredentials = useCallback((result) => {
+    authVersion.current += 1;
     storeToken(result.token);
     setToken(result.token);
     setUser(result.user);

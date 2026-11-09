@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
@@ -106,11 +106,65 @@ describe("authentication screens", () => {
 
   it("registers and redirects to the dashboard", async () => {
     const user = userEvent.setup();
+    const registeredUser = {
+      id: 2,
+      name: "New Patient",
+      email: "new@example.com",
+    };
     apiMocks.post.mockResolvedValue({
       data: {
         token: "registered-token",
-        user: { id: 2, name: "New Patient", email: "new@example.com" },
+        user: registeredUser,
       },
+    });
+    apiMocks.get.mockImplementation((path) => (
+      path === "/auth/me"
+        ? Promise.resolve({ data: { user: registeredUser } })
+        : Promise.resolve({ data: { data: [] } })
+    ));
+    renderApp("/register");
+
+    await user.type(screen.getByLabelText("Name"), "New Patient");
+    await user.type(screen.getByLabelText("Email"), "new@example.com");
+    await user.type(screen.getByLabelText("Password"), "secret-password");
+    await user.type(screen.getByLabelText("Confirm password"), "secret-password");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByRole(
+      "heading",
+      { name: "Welcome, New Patient" },
+      { timeout: 5000 },
+    ))
+      .toBeVisible();
+    expect(localStorage.getItem("sweety_token")).toBe("registered-token");
+  });
+
+  it("ignores a late session restore after registration succeeds", async () => {
+    const user = userEvent.setup();
+    const restoredUser = {
+      id: 1,
+      name: "Sweety User",
+      email: "sweety@example.com",
+    };
+    const registeredUser = {
+      id: 2,
+      name: "New Patient",
+      email: "new@example.com",
+    };
+    let resolveRestore;
+
+    localStorage.setItem("sweety_token", "old-token");
+    apiMocks.get.mockImplementation((path) => {
+      if (path === "/auth/me") {
+        return new Promise((resolve) => {
+          resolveRestore = resolve;
+        });
+      }
+
+      return Promise.resolve({ data: { data: [] } });
+    });
+    apiMocks.post.mockResolvedValue({
+      data: { token: "registered-token", user: registeredUser },
     });
     renderApp("/register");
 
@@ -120,9 +174,20 @@ describe("authentication screens", () => {
     await user.type(screen.getByLabelText("Confirm password"), "secret-password");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(await screen.findByRole("heading", { name: "Welcome, New Patient" }))
+    expect(await screen.findByRole(
+      "heading",
+      { name: "Welcome, New Patient" },
+      { timeout: 5000 },
+    )).toBeVisible();
+
+    await act(async () => {
+      resolveRestore({ data: { user: restoredUser } });
+    });
+
+    expect(screen.getByRole("heading", { name: "Welcome, New Patient" }))
       .toBeVisible();
-    expect(localStorage.getItem("sweety_token")).toBe("registered-token");
+    expect(screen.queryByRole("heading", { name: "Welcome, Sweety User" }))
+      .not.toBeInTheDocument();
   });
 
   it("logs in and persists the token", async () => {
@@ -139,7 +204,11 @@ describe("authentication screens", () => {
     await user.type(screen.getByLabelText("Password"), "secret-password");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByRole("heading", { name: "Welcome, Sweety User" }))
+    expect(await screen.findByRole(
+      "heading",
+      { name: "Welcome, Sweety User" },
+      { timeout: 5000 },
+    ))
       .toBeVisible();
     expect(localStorage.getItem("sweety_token")).toBe("login-token");
   });
