@@ -8,15 +8,18 @@ export const api = axios.create({
 });
 
 export function getStoredToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function storeToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearStoredToken() {
   localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 api.interceptors.request.use((request) => {
@@ -35,11 +38,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = error.config?.url ?? "";
-    const isCredentialRequest = /\/auth\/(login|register)\/?$/.test(requestUrl);
-
-    if (error.response?.status === 401 && !isCredentialRequest) {
+    if (error.response?.status === 401) {
+      const isCredentialRequest = /\/auth\/(login|register)\/?$/.test(requestUrl);
       clearStoredToken();
-      window.dispatchEvent(new Event("sweety:unauthorized"));
+      window.dispatchEvent(new CustomEvent("sweety:unauthorized", {
+        detail: { sessionExpired: !isCredentialRequest },
+      }));
     }
 
     return Promise.reject(error);

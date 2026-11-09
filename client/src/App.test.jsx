@@ -35,6 +35,7 @@ function renderApp(path = "/login") {
 describe("authentication screens", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     apiMocks.get.mockReset();
     apiMocks.post.mockReset();
     apiMocks.get.mockImplementation((path) => (
@@ -136,7 +137,8 @@ describe("authentication screens", () => {
       { timeout: 5000 },
     ))
       .toBeVisible();
-    expect(localStorage.getItem("sweety_token")).toBe("registered-token");
+    expect(sessionStorage.getItem("sweety_token")).toBe("registered-token");
+    expect(localStorage.getItem("sweety_token")).toBeNull();
   });
 
   it("ignores a late session restore after registration succeeds", async () => {
@@ -153,7 +155,7 @@ describe("authentication screens", () => {
     };
     let resolveRestore;
 
-    localStorage.setItem("sweety_token", "old-token");
+    sessionStorage.setItem("sweety_token", "old-token");
     apiMocks.get.mockImplementation((path) => {
       if (path === "/auth/me") {
         return new Promise((resolve) => {
@@ -210,11 +212,12 @@ describe("authentication screens", () => {
       { timeout: 5000 },
     ))
       .toBeVisible();
-    expect(localStorage.getItem("sweety_token")).toBe("login-token");
+    expect(sessionStorage.getItem("sweety_token")).toBe("login-token");
+    expect(localStorage.getItem("sweety_token")).toBeNull();
   });
 
   it("restores the saved token and user after reload", async () => {
-    localStorage.setItem("sweety_token", "restored-token");
+    sessionStorage.setItem("sweety_token", "restored-token");
     renderApp("/dashboard");
 
     expect(await screen.findByRole("heading", { name: "Welcome, Sweety User" }))
@@ -222,9 +225,48 @@ describe("authentication screens", () => {
     expect(apiMocks.get).toHaveBeenCalledWith("/auth/me");
   });
 
+  it("renders a malicious-looking user name as text", async () => {
+    const name = "<img src=x onerror=alert(1)>";
+    sessionStorage.setItem("sweety_token", "restored-token");
+    apiMocks.get.mockImplementation((path) => (
+      path === "/auth/me"
+        ? Promise.resolve({
+          data: { user: { id: 1, name, email: "sweety@example.com" } },
+        })
+        : Promise.resolve({ data: { data: [] } })
+    ));
+    renderApp("/dashboard");
+
+    const heading = await screen.findByRole("heading", {
+      name: `Welcome, ${name}`,
+    });
+
+    expect(heading.textContent).toBe(`Welcome, ${name}`);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("shows a session-expiry message and redirects to login on an expired session", async () => {
+    sessionStorage.setItem("sweety_token", "expired-token");
+    renderApp("/dashboard");
+    await screen.findByRole("heading", { name: "Welcome, Sweety User" });
+
+    act(() => {
+      sessionStorage.removeItem("sweety_token");
+      window.dispatchEvent(new CustomEvent("sweety:unauthorized", {
+        detail: { sessionExpired: true },
+      }));
+    });
+
+    expect(await screen.findByRole("heading", { name: "Log in to Sweety" }))
+      .toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your session expired. Please log in again.",
+    );
+  });
+
   it("logs out and clears the saved token", async () => {
     const user = userEvent.setup();
-    localStorage.setItem("sweety_token", "restored-token");
+    sessionStorage.setItem("sweety_token", "restored-token");
     renderApp("/dashboard");
     await screen.findByRole("heading", { name: "Welcome, Sweety User" });
 
@@ -232,6 +274,7 @@ describe("authentication screens", () => {
 
     expect(await screen.findByRole("heading", { name: "Log in to Sweety" }))
       .toBeVisible();
+    expect(sessionStorage.getItem("sweety_token")).toBeNull();
     expect(localStorage.getItem("sweety_token")).toBeNull();
     expect(apiMocks.post).toHaveBeenCalledWith(
       "/auth/logout",
@@ -242,7 +285,7 @@ describe("authentication screens", () => {
 
   it("changes the password from the profile and stores the refreshed token", async () => {
     const user = userEvent.setup();
-    localStorage.setItem("sweety_token", "restored-token");
+    sessionStorage.setItem("sweety_token", "restored-token");
     apiMocks.post.mockResolvedValue({ data: { token: "refreshed-token" } });
     renderApp("/profile");
     await screen.findByRole("heading", { name: "Change password" });
@@ -253,7 +296,7 @@ describe("authentication screens", () => {
     await user.click(screen.getByRole("button", { name: "Update password" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("Password updated.");
-    expect(localStorage.getItem("sweety_token")).toBe("refreshed-token");
+    expect(sessionStorage.getItem("sweety_token")).toBe("refreshed-token");
     expect(apiMocks.post).toHaveBeenCalledWith("/auth/change-password", {
       currentPassword: "current-password",
       newPassword: "new-password-value",

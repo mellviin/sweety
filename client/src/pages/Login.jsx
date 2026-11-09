@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { getRequestError } from "../utils/requestErrors.js";
 
 export default function Login() {
-  const { login, user } = useAuth();
+  const { login, user, sessionExpired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [values, setValues] = useState({ email: "", password: "" });
@@ -51,6 +51,11 @@ export default function Login() {
           <p>Your readings are waiting for you.</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
+          <ErrorMessage>
+            {sessionExpired || location.state?.sessionExpired
+              ? "Your session expired. Please log in again."
+              : ""}
+          </ErrorMessage>
           <ErrorMessage>{formError}</ErrorMessage>
           <FormField
             id="email"

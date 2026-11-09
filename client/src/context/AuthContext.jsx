@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   api,
   clearStoredToken,
@@ -17,38 +18,51 @@ import {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate();
   const startupToken = useRef(getStoredToken());
   const authVersion = useRef(0);
   const restoreRequest = useRef(null);
   const [token, setToken] = useState(startupToken.current);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const logout = useCallback(async () => {
     const currentToken = getStoredToken();
     authVersion.current += 1;
-    if (currentToken) {
-      await api.post("/auth/logout", {}, {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
+    try {
+      if (currentToken) {
+        await api.post("/auth/logout", {}, {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        });
+      }
+    } finally {
+      clearStoredToken();
+      setToken(null);
+      setUser(null);
     }
-    clearStoredToken();
-    setToken(null);
-    setUser(null);
   }, []);
 
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = (event) => {
       authVersion.current += 1;
+      setLoading(false);
       setToken(null);
       setUser(null);
+      setSessionExpired(Boolean(event.detail?.sessionExpired));
+      if (event.detail?.sessionExpired) {
+        navigate("/login", {
+          replace: true,
+          state: { sessionExpired: true },
+        });
+      }
     };
 
     window.addEventListener("sweety:unauthorized", handleUnauthorized);
     return () => {
       window.removeEventListener("sweety:unauthorized", handleUnauthorized);
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const tokenAtStartup = startupToken.current;
@@ -93,6 +107,7 @@ export function AuthProvider({ children }) {
 
   const acceptCredentials = useCallback((result) => {
     authVersion.current += 1;
+    setSessionExpired(false);
     storeToken(result.token);
     setToken(result.token);
     setUser(result.user);
@@ -119,8 +134,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, loading, login, register, logout, changePassword }),
-    [user, token, loading, login, register, logout, changePassword],
+    () => ({
+      user,
+      token,
+      loading,
+      sessionExpired,
+      login,
+      register,
+      logout,
+      changePassword,
+    }),
+    [user, token, loading, sessionExpired, login, register, logout, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

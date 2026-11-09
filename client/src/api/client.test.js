@@ -1,6 +1,11 @@
 import { AxiosError } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, clearStoredToken, storeToken } from "./client.js";
+import {
+  api,
+  clearStoredToken,
+  getStoredToken,
+  storeToken,
+} from "./client.js";
 
 const originalAdapter = api.defaults.adapter;
 
@@ -10,6 +15,17 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it("uses sessionStorage and removes any legacy persistent token", () => {
+    localStorage.setItem("sweety_token", "legacy-token");
+
+    expect(getStoredToken()).toBeNull();
+    expect(localStorage.getItem("sweety_token")).toBeNull();
+
+    storeToken("session-token");
+    expect(sessionStorage.getItem("sweety_token")).toBe("session-token");
+    expect(localStorage.getItem("sweety_token")).toBeNull();
+  });
+
   it("adds the saved bearer token to requests", async () => {
     storeToken("saved-token");
     const adapter = vi.fn(async (request) => ({
@@ -45,14 +61,17 @@ describe("API client", () => {
         response: { status: 401 },
       });
 
+      expect(sessionStorage.getItem("sweety_token")).toBeNull();
       expect(localStorage.getItem("sweety_token")).toBeNull();
       expect(onUnauthorized).toHaveBeenCalledOnce();
+      expect(onUnauthorized.mock.calls[0][0].detail)
+        .toEqual({ sessionExpired: true });
     } finally {
       window.removeEventListener("sweety:unauthorized", onUnauthorized);
     }
   });
 
-  it("does not redirect for credential errors from the login endpoint", async () => {
+  it("clears the token without treating bad credentials as session expiry", async () => {
     storeToken("existing-token");
     const onUnauthorized = vi.fn();
     window.addEventListener("sweety:unauthorized", onUnauthorized);
@@ -70,8 +89,11 @@ describe("API client", () => {
         response: { status: 401 },
       });
 
-      expect(localStorage.getItem("sweety_token")).toBe("existing-token");
-      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem("sweety_token")).toBeNull();
+      expect(localStorage.getItem("sweety_token")).toBeNull();
+      expect(onUnauthorized).toHaveBeenCalledOnce();
+      expect(onUnauthorized.mock.calls[0][0].detail)
+        .toEqual({ sessionExpired: false });
     } finally {
       window.removeEventListener("sweety:unauthorized", onUnauthorized);
     }
