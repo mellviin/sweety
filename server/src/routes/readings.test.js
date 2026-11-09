@@ -36,8 +36,8 @@ beforeEach(async () => {
        ('User B', 'user-b@example.com', 'test-hash')
      RETURNING id`,
   );
-  userAToken = jwt.sign({ sub: String(users.rows[0].id) }, config.jwtSecret);
-  userBToken = jwt.sign({ sub: String(users.rows[1].id) }, config.jwtSecret);
+  userAToken = createTestToken(users.rows[0].id);
+  userBToken = createTestToken(users.rows[1].id);
   today = todayInTimezone(config.appTimezone);
 });
 
@@ -434,6 +434,18 @@ describe("DELETE /readings/:id", () => {
 
 function authHeader(token = userAToken) {
   return { Authorization: `Bearer ${token}` };
+}
+
+function createTestToken(userId) {
+  return jwt.sign(
+    { sub: String(userId), tv: 0 },
+    config.jwtSecret,
+    {
+      algorithm: "HS256",
+      issuer: config.jwtIssuer,
+      audience: config.jwtAudience,
+    },
+  );
 }
 
 function createReading(reading, token = userAToken) {

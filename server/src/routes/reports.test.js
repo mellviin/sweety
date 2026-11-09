@@ -37,7 +37,15 @@ beforeEach(async () => {
      RETURNING id`,
   );
   [userAId, userBId] = result.rows.map((row) => row.id);
-  userAToken = jwt.sign({ sub: String(userAId) }, config.jwtSecret);
+  userAToken = jwt.sign(
+    { sub: String(userAId), tv: 0 },
+    config.jwtSecret,
+    {
+      algorithm: "HS256",
+      issuer: config.jwtIssuer,
+      audience: config.jwtAudience,
+    },
+  );
 });
 
 afterAll(async () => {

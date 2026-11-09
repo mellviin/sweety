@@ -1,13 +1,21 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import ErrorMessage from "./ErrorMessage.jsx";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState("");
 
-  function handleLogout() {
-    logout();
-    navigate("/login", { replace: true });
+  async function handleLogout() {
+    setLogoutError("");
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch {
+      setLogoutError("Could not contact the server to revoke your session.");
+    }
   }
 
   return (
@@ -19,6 +27,7 @@ export default function Navbar() {
         <div className="nav-links">
           <NavLink to="/dashboard">Dashboard</NavLink>
           <NavLink to="/reports">Reports</NavLink>
+          <NavLink to="/profile">Profile</NavLink>
         </div>
         <div className="nav-user">
           <span className="nav-greeting">Hello, {user?.name}</span>
@@ -27,6 +36,7 @@ export default function Navbar() {
           </button>
         </div>
       </nav>
+      <ErrorMessage>{logoutError}</ErrorMessage>
     </header>
   );
 }

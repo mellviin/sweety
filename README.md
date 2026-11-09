@@ -107,8 +107,9 @@ Do not use the example JWT value outside local development. Replace it with a st
 | `POSTGRES_PASSWORD` | Password for the PostgreSQL initialization superuser, used by Docker Compose. | Set a private value; no default. |
 | `APP_DB_PASSWORD` | Password for the least-privilege app role. | Set a private value. |
 | `MIGRATE_DB_PASSWORD` | Password for the schema-owning migration role. | Set a private value distinct from the app password. |
-| `JWT_SECRET` | Secret used to sign and verify API tokens. Required to start the API. | Replace the example value with a private random secret. |
-| `JWT_EXPIRES_IN` | JWT lifetime accepted by `jsonwebtoken` (for example `1d`). | `1d` |
+| `JWT_SECRET` | Secret used to sign and verify API tokens. Required to start the API; must be at least 32 characters. | Replace the example value with a private random secret. |
+| `JWT_EXPIRES_IN` | JWT lifetime accepted by `jsonwebtoken` (for example `1h`). | `1h` |
+| `JWT_ISSUER` / `JWT_AUDIENCE` | Issuer and audience required on every API access token. | `sweety-api` / `sweety-client` |
 | `NODE_ENV` | Node runtime mode; tests set this to `test`, which disables auth rate limiting and selects `TEST_DATABASE_URL`. | `development` |
 | `PORT` | Express listening port. | `3000` |
 | `CLIENT_URL` | Allowed browser origin for CORS. | `http://localhost:5173` |

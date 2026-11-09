@@ -32,9 +32,13 @@ describe("runMigrations", () => {
     await runMigrations(database);
     await runMigrations(database);
 
-    expect(appliedMigrations).toEqual(new Set(["001_init.sql", "002_hardening.sql"]));
+    expect(appliedMigrations).toEqual(new Set([
+      "001_init.sql",
+      "002_hardening.sql",
+      "003_auth_hardening.sql",
+    ]));
     expect(statements.filter((sql) => sql.startsWith("CREATE TABLE users"))).toHaveLength(1);
-    expect(statements.filter((sql) => sql === "BEGIN")).toHaveLength(2);
-    expect(statements.filter((sql) => sql === "COMMIT")).toHaveLength(2);
+    expect(statements.filter((sql) => sql === "BEGIN")).toHaveLength(3);
+    expect(statements.filter((sql) => sql === "COMMIT")).toHaveLength(3);
   });
 });

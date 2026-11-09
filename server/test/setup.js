@@ -1,5 +1,5 @@
 process.env.NODE_ENV = "test";
-process.env.JWT_SECRET ??= "sweety-test-only-signing-key";
+process.env.JWT_SECRET ??= "sweety-test-only-signing-key-at-least-32";
 
 const { config } = await import("../src/config/env.js");
 

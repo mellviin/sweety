@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Login from "./pages/Login.jsx";
+import Profile from "./pages/Profile.jsx";
 import Register from "./pages/Register.jsx";
 import Reports from "./pages/Reports.jsx";
 
@@ -40,6 +41,14 @@ export default function App() {
         element={
           <AuthenticatedPage>
             <Reports />
+          </AuthenticatedPage>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <AuthenticatedPage>
+            <Profile />
           </AuthenticatedPage>
         }
       />

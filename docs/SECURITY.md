@@ -9,6 +9,7 @@
 | API runtime holding schema-altering credentials or failing on absent migration URL | Create the migration pool lazily and restrict it to migration, seed, and test flows; validate the app database URL with a clear startup error. | `server/src/db/pool.js`, `server/src/server.js`, `server/src/db/migrate.js` | `server/src/db/security-config.test.js`, `server/src/db/roles.test.js` |
 | Browser injection, cross-origin requests, cached sensitive responses, malformed/oversized or polluted request bodies, and slow connections | Add strict Helmet headers, exact-origin CORS, no-store route headers, bounded JSON parsing, body validation, HPP, and HTTP server timeouts. | `server/src/app.js`, `server/src/middleware/httpHardening.js`, `server/src/middleware/errorHandler.js`, `server/src/server.js` | `server/src/app.test.js` |
 | Brute-force login attempts and excessive API/read-write traffic | Apply configurable global, auth, hashed-email failed-login, and per-user reading-write limits with `Retry-After`; failed-login state is held only as a SHA-256 email hash plus IP and timestamp. | `server/src/middleware/rateLimit.js`, `server/src/routes/auth.js`, `server/src/routes/readings.js` | `server/src/app.test.js`, `server/src/routes/auth.test.js`, `server/src/routes/readings.test.js` |
+| Weak/reused passwords, login enumeration, forged/stale tokens, and persistent compromised sessions | Enforce the local common-password policy, compare a dummy bcrypt hash for unknown users, require HS256 plus issuer/audience/expiry, and invalidate tokens with a database token version on logout/password change. | `server/src/services/authService.js`, `server/src/services/passwordPolicy.js`, `server/src/middleware/auth.js`, `server/src/db/migrations/003_auth_hardening.sql` | `server/src/routes/auth.test.js` |
 
 ## Known limitations
 
@@ -17,3 +18,4 @@
 - Recreating the data volume applies changed role provisioning but permanently deletes local database data.
 - PostgreSQL grants and constraints are not a substitute for production network isolation, backups, or managed secret storage.
 - Failed-login counters are in-process and are not shared across API instances or preserved across restarts.
+- Registration deliberately retains its assignment-required 409 duplicate-email response, which reveals whether an email is registered; mitigating this enumeration channel would require changing that agreed API behavior.

@@ -29,7 +29,9 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "1h",
+  jwtIssuer: process.env.JWT_ISSUER ?? "sweety-api",
+  jwtAudience: process.env.JWT_AUDIENCE ?? "sweety-client",
   port: Number(process.env.PORT ?? 3000),
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
@@ -58,8 +60,10 @@ export const config = {
 };
 
 export function assertJwtSecret() {
-  if (!config.jwtSecret) {
-    throw new Error("JWT_SECRET must be set before the API can start.");
+  if (!config.jwtSecret || config.jwtSecret.length < 32) {
+    throw new Error(
+      "JWT_SECRET must be set to at least 32 characters before the API can start.",
+    );
   }
 }
 

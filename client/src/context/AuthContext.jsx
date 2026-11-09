@@ -24,8 +24,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentToken = getStoredToken();
     authVersion.current += 1;
+    if (currentToken) {
+      await api.post("/auth/logout", {}, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+    }
     clearStoredToken();
     setToken(null);
     setUser(null);
@@ -105,9 +111,16 @@ export function AuthProvider({ children }) {
     return response.data.user;
   }, [acceptCredentials]);
 
+  const changePassword = useCallback(async (passwords) => {
+    const response = await api.post("/auth/change-password", passwords);
+    storeToken(response.data.token);
+    setToken(response.data.token);
+    return response.data;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, token, loading, login, register, logout }),
-    [user, token, loading, login, register, logout],
+    () => ({ user, token, loading, login, register, logout, changePassword }),
+    [user, token, loading, login, register, logout, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

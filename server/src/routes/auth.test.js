@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../app.js";
 import { config } from "../config/env.js";
@@ -55,6 +56,7 @@ describe("POST /auth/register", () => {
 
     expect(storedHash.password_hash).not.toBe(userInput.password);
     expect(await bcrypt.compare(userInput.password, storedHash.password_hash)).toBe(true);
+    expect(bcrypt.getRounds(storedHash.password_hash)).toBe(12);
   });
 
   test("returns 409 when the email already exists", async () => {
@@ -84,6 +86,20 @@ describe("POST /auth/register", () => {
     expect(invalidEmail.body.error.field).toBe("email");
     expect(shortPassword.status).toBe(400);
     expect(shortPassword.body.error.field).toBe("password");
+  });
+
+  test.each([
+    ["common", "password", "Choose a less common password."],
+    ["over 72 characters", "a".repeat(73), "Password must be no more than 72 characters."],
+    ["matching the email", "sweety.user@example.com", "Password must not match your email or name."],
+    ["matching the name", "Sweety User", "Password must not match your email or name."],
+  ])("rejects a %s password", async (_scenario, password, message) => {
+    const response = await request(app)
+      .post("/auth/register")
+      .send({ ...userInput, password });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual({ field: "password", message });
   });
 
   test("rejects blank and overlong names", async () => {
@@ -118,8 +134,10 @@ describe("POST /auth/register", () => {
 });
 
 describe("POST /auth/login", () => {
+  let registration;
+
   beforeEach(async () => {
-    await request(app).post("/auth/register").send(userInput);
+    registration = await request(app).post("/auth/register").send(userInput);
   });
 
   test("logs in with a case-insensitive email and correct password", async () => {
@@ -149,8 +167,106 @@ describe("POST /auth/login", () => {
     expect(response.body).toEqual({
       error: { field: null, message: "Invalid email or password." },
     });
+
   });
 
+  test("unknown email and wrong password have identical responses", async () => {
+      const wrongPassword = await request(app)
+        .post("/auth/login")
+        .send({ email: userInput.email, password: "wrong-password" });
+      const unknownEmail = await request(app)
+        .post("/auth/login")
+        .send({ email: "unknown@example.com", password: "wrong-password" });
+
+      expect(unknownEmail.status).toBe(wrongPassword.status);
+      expect(unknownEmail.body).toEqual(wrongPassword.body);
+      expect(unknownEmail.body).toEqual({
+        error: { field: null, message: "Invalid email or password." },
+      });
+    });
+
+  test("only accepts HS256 tokens with the configured claims and current version", async () => {
+      const userId = registration.body.user.id;
+      const claims = { sub: String(userId), tv: 0 };
+      const validOptions = {
+        algorithm: "HS256",
+        issuer: config.jwtIssuer,
+        audience: config.jwtAudience,
+      };
+      const tampered = registration.body.token.split(".");
+      tampered[1] = Buffer.from(JSON.stringify({
+        sub: String(userId + 1),
+        tv: 0,
+        iss: config.jwtIssuer,
+        aud: config.jwtAudience,
+        iat: Math.floor(Date.now() / 1000),
+      })).toString("base64url");
+      const invalidTokens = [
+        jwt.sign(claims, null, {
+          algorithm: "none",
+          issuer: config.jwtIssuer,
+          audience: config.jwtAudience,
+        }),
+        jwt.sign(claims, `${config.jwtSecret}wrong`, validOptions),
+        jwt.sign(claims, config.jwtSecret, { ...validOptions, expiresIn: -1 }),
+        tampered.join("."),
+        jwt.sign(claims, config.jwtSecret, { ...validOptions, issuer: "wrong-issuer" }),
+        jwt.sign(claims, config.jwtSecret, { ...validOptions, audience: "wrong-audience" }),
+      ];
+
+      for (const token of invalidTokens) {
+        const response = await request(app)
+          .get("/auth/me")
+          .set("Authorization", `Bearer ${token}`);
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({
+          error: { field: null, message: "Please log in to continue." },
+        });
+      }
+    });
+
+  test("logout invalidates the current token version", async () => {
+      const authorization = `Bearer ${registration.body.token}`;
+
+      const logout = await request(app)
+        .post("/auth/logout")
+        .send({})
+        .set("Authorization", authorization);
+      const currentUser = await request(app)
+        .get("/auth/me")
+        .set("Authorization", authorization);
+
+      expect(logout.status).toBe(204);
+      expect(currentUser.status).toBe(401);
+    });
+
+  test("password change invalidates old token and returns a fresh token", async () => {
+      const oldAuthorization = `Bearer ${registration.body.token}`;
+      const changed = await request(app)
+        .post("/auth/change-password")
+        .set("Authorization", oldAuthorization)
+        .send({
+          currentPassword: userInput.password,
+          newPassword: "a-different-strong-password",
+        });
+
+      expect(changed.status).toBe(200);
+      expect(typeof changed.body.token).toBe("string");
+      expect((await request(app)
+        .get("/auth/me")
+        .set("Authorization", oldAuthorization)).status).toBe(401);
+      expect((await request(app)
+        .get("/auth/me")
+        .set("Authorization", `Bearer ${changed.body.token}`)).status).toBe(200);
+
+      const saved = await pool.query(
+        "SELECT password_hash FROM users WHERE email = $1",
+        ["sweety.user@example.com"],
+      );
+      expect(await bcrypt.compare("a-different-strong-password", saved.rows[0].password_hash))
+        .toBe(true);
+      expect(bcrypt.getRounds(saved.rows[0].password_hash)).toBe(12);
+    });
   describe("rate limiting", () => {
     const originalRateLimitEnabled = config.rateLimitsEnabled;
     const originalAuthLimit = config.authRateLimitMax;
@@ -159,8 +275,9 @@ describe("POST /auth/login", () => {
 
     beforeAll(() => {
       config.rateLimitsEnabled = true;
+      config.authRateLimitMax = 100;
       config.loginFailureRateLimitMax = 5;
-      config.loginFailureRateLimitWindowMs = 500;
+      config.loginFailureRateLimitWindowMs = 5000;
     });
 
     afterAll(() => {
@@ -210,14 +327,14 @@ describe("POST /auth/login", () => {
         expect(response.status).toBe(401);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 525));
+      await new Promise((resolve) => setTimeout(resolve, 5025));
 
       const afterWindow = await request(app)
         .post("/auth/login")
         .send({ email, password: "wrong-password" });
       expect(afterWindow.status).toBe(401);
       expect(afterWindow.body.error.message).toBe("Invalid email or password.");
-    });
+    }, 15000);
 
     test("the auth endpoint limiter has a configurable limit in test mode", async () => {
       const previousTrustProxy = app.get("trust proxy");

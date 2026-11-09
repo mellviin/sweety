@@ -233,6 +233,31 @@ describe("authentication screens", () => {
     expect(await screen.findByRole("heading", { name: "Log in to Sweety" }))
       .toBeVisible();
     expect(localStorage.getItem("sweety_token")).toBeNull();
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      "/auth/logout",
+      {},
+      { headers: { Authorization: "Bearer restored-token" } },
+    );
+  });
+
+  it("changes the password from the profile and stores the refreshed token", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("sweety_token", "restored-token");
+    apiMocks.post.mockResolvedValue({ data: { token: "refreshed-token" } });
+    renderApp("/profile");
+    await screen.findByRole("heading", { name: "Change password" });
+
+    await user.type(screen.getByLabelText("Current password"), "current-password");
+    await user.type(screen.getByLabelText("New password"), "new-password-value");
+    await user.type(screen.getByLabelText("Confirm new password"), "new-password-value");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Password updated.");
+    expect(localStorage.getItem("sweety_token")).toBe("refreshed-token");
+    expect(apiMocks.post).toHaveBeenCalledWith("/auth/change-password", {
+      currentPassword: "current-password",
+      newPassword: "new-password-value",
+    });
   });
 
   it("renders field-specific server validation errors", async () => {
