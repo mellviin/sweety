@@ -49,24 +49,30 @@ export function createLogger(writeLine = (line) => process.stdout.write(line)) {
       event: sanitizeLogValue(event, 80),
     };
 
-    for (const field of permittedFields) {
-      const value = fields[field];
-      if (value === undefined || value === null) {
-        continue;
+    const safeFields = Object.entries(fields).flatMap(([field, value]) => {
+      if (!permittedFields.includes(field) || value === undefined || value === null) {
+        return [];
       }
 
       if (field === "email") {
-        record.email = maskEmail(value);
-      } else if (typeof value === "string") {
-        record[field] = sanitizeLogValue(value, field === "user_agent" ? 512 : 256);
-      } else if (field === "user_id" || field === "status") {
-        if (Number.isSafeInteger(value)) {
-          record[field] = value;
-        }
-      } else if (field === "port" && Number.isSafeInteger(value)) {
-        record[field] = value;
+        return [[field, maskEmail(value)]];
       }
-    }
+
+      if (typeof value === "string") {
+        return [[field, sanitizeLogValue(value, field === "user_agent" ? 512 : 256)]];
+      }
+
+      if (
+        (field === "user_id" || field === "status" || field === "port")
+        && Number.isSafeInteger(value)
+      ) {
+        return [[field, value]];
+      }
+
+      return [];
+    });
+
+    Object.assign(record, Object.fromEntries(safeFields));
 
     writeLine(`${JSON.stringify(record)}\n`);
   }

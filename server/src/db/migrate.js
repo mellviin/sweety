@@ -47,6 +47,8 @@ export async function runMigrations(database = getMigrationPool()) {
         continue;
       }
 
+      // Migration names come only from the fixed migrations directory listing.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- the joined path is constrained to that directory.
       const migration = await readFile(join(migrationsDirectory, file), "utf8");
 
       await client.query("BEGIN");

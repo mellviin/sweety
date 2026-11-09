@@ -2,14 +2,14 @@ import { pool } from "../db/pool.js";
 import { config } from "../config/env.js";
 import { isValidDateString, todayInTimezone } from "../utils/dates.js";
 
-const slotLabels = {
-  MORNING_FASTING: "Morning (fasting)",
-  AFTER_BREAKFAST: "After breakfast",
-  AFTER_LUNCH: "After lunch",
-  AFTER_DINNER: "After dinner",
-};
+const slotLabels = new Map([
+  ["MORNING_FASTING", "Morning (fasting)"],
+  ["AFTER_BREAKFAST", "After breakfast"],
+  ["AFTER_LUNCH", "After lunch"],
+  ["AFTER_DINNER", "After dinner"],
+]);
 
-const slots = Object.keys(slotLabels);
+const slots = [...slotLabels.keys()];
 
 export async function createReading(userId, input) {
   const reading = validateReadingInput(input);
@@ -249,7 +249,7 @@ function formatReading(row) {
     id: row.id,
     date: row.reading_date,
     slot: row.slot,
-    slotLabel: slotLabels[row.slot],
+    slotLabel: slotLabels.get(row.slot),
     value: row.value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -283,7 +283,7 @@ function validationError(field, message, status = 400) {
 function duplicateSlotError(slot) {
   return validationError(
     "slot",
-    `You already have a ${slotLabels[slot]} reading for this date.`,
+    `You already have a ${slotLabels.get(slot)} reading for this date.`,
     409,
   );
 }

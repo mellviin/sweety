@@ -2,7 +2,7 @@ export function strictFields(location, allowedFields) {
   const allowed = new Set(allowedFields);
 
   return (request, _response, next) => {
-    const fields = request[location];
+    const fields = location === "body" ? request.body : request.query;
     if (fields === undefined && location === "body") {
       return next();
     }

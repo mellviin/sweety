@@ -13,6 +13,7 @@
 | Cross-user reading access, mass assignment, malformed inputs, and SQL injection | Scope reading/report queries to the verified user ID, reject unknown request fields (including `user_id`/`userId`), validate scalar IDs/dates/pagination, and use static SQL with parameterized values. | `server/src/services/readingService.js`, `server/src/services/reportService.js`, `server/src/middleware/strictFields.js`, `server/src/db/seed.js` | `server/src/routes/readings.test.js`, `server/src/routes/reports.test.js`, `server/src/routes/auth.test.js`, `server/src/security/sqlQuerySafety.test.js` |
 | Persistent exposure of bearer tokens and client-side script injection | Keep the Authorization-header model, store the token in `sessionStorage`, clear it on logout and every 401, and disallow dangerous React HTML insertion with ESLint and CSP. | `client/src/api/client.js`, `client/src/context/AuthContext.jsx`, `client/eslint.config.js`, `client/index.html`, `client/vite.config.js` | `client/src/api/client.test.js`, `client/src/App.test.jsx` |
 | Sensitive data leakage or forged log lines, and lack of security-event auditability | Emit JSON logs from a strict field allow-list, sanitize control characters and mask emails, attach a validated request ID, and persist limited auth/rate-limit events in an app-role INSERT/SELECT-only table. | `server/src/utils/logger.js`, `server/src/middleware/requestContext.js`, `server/src/services/securityEventService.js`, `server/src/db/migrations/004_security_events.sql` | `server/src/app.test.js`, `server/src/routes/auth.test.js`, `server/src/db/roles.test.js` |
+| Vulnerable dependencies, leaked secrets, and unreviewed code changes | Run lockfile-based installs, high/critical npm audits, Gitleaks history scanning, Trivy filesystem scanning, and CodeQL; configure weekly dependency updates and least-privilege workflow permissions. | `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.github/dependabot.yml`, `server/package-lock.json`, `client/package-lock.json` | CI audit, Gitleaks, Trivy, and CodeQL jobs |
 
 ### Browser security headers
 
@@ -35,6 +36,7 @@ If the API is served from a separate origin, add only that exact HTTPS origin to
 - Request schemas reject unknown body and query fields with 400; clients must not send extra fields such as `user_id` or `userId`.
 - The bearer token remains accessible to same-origin JavaScript in `sessionStorage`; session storage reduces persistence but does not prevent theft by a successful XSS.
 - Security-event records include IP addresses and user-agent strings; establish and enforce an operational retention period appropriate to the deployment.
+- Full-history Gitleaks scanning found one possible JWT-secret-like value in `.env.example` at commit `838275bb09896574545ec6b4b4a1dac7b3829275`. The exact finding is baselined in `.gitleaksignore`; history was not rewritten. Treat any credential that may have reused that value as exposed and rotate it.
 
 ## What I'd do next
 

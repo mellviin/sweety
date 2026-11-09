@@ -39,7 +39,7 @@ export async function seedDemoData(database = pool) {
 
   for (const [index, date] of previousMonthDates.entries()) {
     if (!dayCounts.has(date)) {
-      dayCounts.set(date, [4, 2, 3][index]);
+      dayCounts.set(date, [4, 2, 3].at(index));
     }
   }
 
@@ -54,7 +54,7 @@ export async function seedDemoData(database = pool) {
     for (let slotIndex = 0; slotIndex < readingCount; slotIndex += 1) {
       seededReadings.push({
         date,
-        slot: slots[slotIndex],
+        slot: slots.at(slotIndex),
         value: glucoseValue({
           slotIndex,
           dateIndex,
@@ -198,7 +198,7 @@ function glucoseValue({ slotIndex, dateIndex, random }) {
     return 258;
   }
 
-  const [minimum, maximum] = slotRanges[slotIndex];
+  const [minimum, maximum] = slotRanges.at(slotIndex);
   return minimum + Math.floor(random() * (maximum - minimum + 1));
 }
 
