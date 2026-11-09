@@ -13,7 +13,6 @@ dotenv.config({
 
 export const config = {
   databaseUrl: process.env.DATABASE_URL,
-  migrationDatabaseUrl: process.env.MIGRATION_DATABASE_URL,
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",
@@ -29,5 +28,26 @@ export const config = {
 export function assertJwtSecret() {
   if (!config.jwtSecret) {
     throw new Error("JWT_SECRET must be set before the API can start.");
+  }
+}
+
+export function assertDatabaseUrl() {
+  if (!config.databaseUrl) {
+    throw new Error("DATABASE_URL must be set before the API can start.");
+  }
+
+  let databaseUrl;
+  try {
+    databaseUrl = new URL(config.databaseUrl);
+  } catch {
+    throw new Error("DATABASE_URL must be a valid PostgreSQL connection URL.");
+  }
+
+  if (
+    !["postgres:", "postgresql:"].includes(databaseUrl.protocol)
+    || !databaseUrl.hostname
+    || !databaseUrl.pathname.slice(1)
+  ) {
+    throw new Error("DATABASE_URL must be a valid PostgreSQL connection URL.");
   }
 }

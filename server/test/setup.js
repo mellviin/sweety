@@ -6,3 +6,7 @@ const { config } = await import("../src/config/env.js");
 if (!config.testDatabaseUrl) {
   throw new Error("TEST_DATABASE_URL must be set to run the test suite.");
 }
+
+if (!process.env.MIGRATION_DATABASE_URL) {
+  throw new Error("MIGRATION_DATABASE_URL must be set to run the test suite.");
+}

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../app.js";
 import { config } from "../config/env.js";
-import { migrationPool, pool } from "../db/pool.js";
+import { getMigrationPool, pool } from "../db/pool.js";
 import { runMigrations } from "../db/migrate.js";
 import { todayInTimezone } from "../utils/dates.js";
 
@@ -24,11 +24,11 @@ let userBToken;
 let today;
 
 beforeAll(async () => {
-  await runMigrations(migrationPool);
+  await runMigrations(getMigrationPool());
 });
 
 beforeEach(async () => {
-  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await getMigrationPool().query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   const users = await pool.query(
     `INSERT INTO users (name, email, password_hash)
      VALUES
@@ -42,9 +42,9 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await getMigrationPool().query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   await pool.end();
-  await migrationPool.end();
+  await getMigrationPool().end();
 });
 
 describe("POST /readings", () => {

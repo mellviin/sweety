@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import request from "supertest";
 import app from "../app.js";
-import { migrationPool, pool } from "../db/pool.js";
+import { getMigrationPool, pool } from "../db/pool.js";
 import { runMigrations } from "../db/migrate.js";
 
 const userInput = {
@@ -11,16 +11,16 @@ const userInput = {
 };
 
 beforeAll(async () => {
-  await runMigrations(migrationPool);
+  await runMigrations(getMigrationPool());
 });
 
 beforeEach(async () => {
-  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await getMigrationPool().query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
 });
 
 afterAll(async () => {
   await pool.end();
-  await migrationPool.end();
+  await getMigrationPool().end();
 });
 
 describe("POST /auth/register", () => {

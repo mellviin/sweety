@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { fileURLToPath } from "node:url";
 import { config } from "../config/env.js";
-import { pool } from "./pool.js";
+import { getMigrationPool, pool } from "./pool.js";
+import { runMigrations } from "./migrate.js";
 import {
   previousMonthRange,
   todayInTimezone,
@@ -201,7 +202,10 @@ function glucoseValue({ slotIndex, dateIndex, random }) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  let migrationPool;
   try {
+    migrationPool = getMigrationPool();
+    await runMigrations(migrationPool);
     const result = await seedDemoData();
     console.info(
       `Seeded ${result.readingCount} readings from ${result.from} to ${result.to}.`,
@@ -212,5 +216,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exitCode = 1;
   } finally {
     await pool.end();
+    if (migrationPool) {
+      await migrationPool.end();
+    }
   }
 }

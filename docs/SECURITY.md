@@ -6,7 +6,7 @@
 | API role escalating privileges or modifying schema | Separate non-superuser app and migration roles; app role receives only CRUD on app tables and limited sequence access. | `server/src/db/init/001_create_databases.sql`, `server/src/db/migrations/002_hardening.sql` | `server/src/db/roles.test.js` |
 | Invalid or duplicate glucose records and non-cascading user deletion | Enforce non-null, value/slot checks, case-insensitive email and reading uniqueness, and cascading foreign key. | `server/src/db/migrations/002_hardening.sql` | `server/src/db/roles.test.js` |
 | Unbounded database resource use or indefinitely slow statements | Cap pool size and set idle, connection, and statement timeouts. | `server/src/db/pool.js` | Server test suite |
-| Migration operations running with application credentials | Use `MIGRATION_DATABASE_URL` for migrations and keep the app pool on `DATABASE_URL` / `TEST_DATABASE_URL`. | `server/src/db/migrate.js`, `server/src/db/pool.js` | `server/src/db/migrate.test.js`, `server/src/db/roles.test.js` |
+| API runtime holding schema-altering credentials or failing on absent migration URL | Create the migration pool lazily and restrict it to migration, seed, and test flows; validate the app database URL with a clear startup error. | `server/src/db/pool.js`, `server/src/server.js`, `server/src/db/migrate.js` | `server/src/db/security-config.test.js`, `server/src/db/roles.test.js` |
 
 ## Known limitations
 

@@ -12,8 +12,17 @@ const poolOptions = {
   statement_timeout: 5_000,
 };
 
+let migrationPool;
+
 function getMigrationConnectionString() {
-  const migrationUrl = new URL(config.migrationDatabaseUrl);
+  const configuredUrl = process.env.MIGRATION_DATABASE_URL;
+  if (!configuredUrl) {
+    throw new Error(
+      "MIGRATION_DATABASE_URL must be set to run database migrations.",
+    );
+  }
+
+  const migrationUrl = new URL(configuredUrl);
 
   if (process.env.NODE_ENV === "test") {
     const testUrl = new URL(config.testDatabaseUrl);
@@ -33,7 +42,13 @@ export const pool = new Pool({
     : config.databaseUrl,
 });
 
-export const migrationPool = new Pool({
-  ...poolOptions,
-  connectionString: getMigrationConnectionString(),
-});
+export function getMigrationPool() {
+  if (!migrationPool) {
+    migrationPool = new Pool({
+      ...poolOptions,
+      connectionString: getMigrationConnectionString(),
+    });
+  }
+
+  return migrationPool;
+}

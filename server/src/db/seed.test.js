@@ -1,21 +1,21 @@
 import request from "supertest";
 import app from "../app.js";
-import { migrationPool, pool } from "./pool.js";
+import { getMigrationPool, pool } from "./pool.js";
 import { runMigrations } from "./migrate.js";
 import { seedDemoData } from "./seed.js";
 
 beforeAll(async () => {
-  await runMigrations(migrationPool);
+  await runMigrations(getMigrationPool());
 });
 
 beforeEach(async () => {
-  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await getMigrationPool().query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
 });
 
 afterAll(async () => {
-  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await getMigrationPool().query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   await pool.end();
-  await migrationPool.end();
+  await getMigrationPool().end();
 });
 
 test("seeds varied readings and allows the demo user to log in", async () => {

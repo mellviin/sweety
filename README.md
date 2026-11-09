@@ -102,7 +102,7 @@ Do not use the example JWT value outside local development. Replace it with a st
 | Variable | Purpose | Default/example |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string used by the API and seed command. | `postgresql://sweety_app:<password>@localhost:5432/sweety` |
-| `MIGRATION_DATABASE_URL` | Connection string for the schema-owning role, used by `npm run migrate` and test setup only. | `postgresql://sweety_migrate:<password>@localhost:5432/sweety` |
+| `MIGRATION_DATABASE_URL` | Connection string for the schema-owning role, used only by the migrate/seed commands and test setup; not needed by the API server. | `postgresql://sweety_migrate:<password>@localhost:5432/sweety` |
 | `TEST_DATABASE_URL` | Dedicated app-role connection string used by Jest; migrations are applied with `MIGRATION_DATABASE_URL`. | `postgresql://sweety_app:<password>@localhost:5432/sweety_test` |
 | `POSTGRES_PASSWORD` | Password for the PostgreSQL initialization superuser, used by Docker Compose. | Set a private value; no default. |
 | `APP_DB_PASSWORD` | Password for the least-privilege app role. | Set a private value. |

@@ -1,13 +1,13 @@
-import { migrationPool, pool } from "./pool.js";
+import { getMigrationPool, pool } from "./pool.js";
 import { runMigrations } from "./migrate.js";
 
 beforeAll(async () => {
-  await runMigrations(migrationPool);
+  await runMigrations(getMigrationPool());
 });
 
 afterAll(async () => {
   await pool.end();
-  await migrationPool.end();
+  await getMigrationPool().end();
 });
 
 test("the app database role cannot perform administrative actions", async () => {
@@ -40,7 +40,7 @@ test("database pools have bounded resources and statement timeouts", () => {
 });
 
 test("the test migration pool targets the test database with migration credentials", () => {
-  const migrationUrl = new URL(migrationPool.options.connectionString);
+  const migrationUrl = new URL(getMigrationPool().options.connectionString);
   expect(migrationUrl.pathname).toBe("/sweety_test");
   expect(migrationUrl.username).toBe("sweety_migrate");
 });
