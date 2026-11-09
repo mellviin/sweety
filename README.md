@@ -177,6 +177,8 @@ npm run build
 
 GitHub Actions runs database migration, both linters, both test suites, and the client production build on pushes and pull requests.
 
+Run server and client tests separately, not at the same time (the rate-limit tests are timing-sensitive).
+
 ## Seed demo data
 
 From `server`, run:
