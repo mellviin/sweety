@@ -8,7 +8,11 @@ export function todayInTimezone(timezone) {
 }
 
 export function isValidDateString(value) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (
+    typeof value !== "string"
+    || value.length !== 10
+    || !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
     return false;
   }
 
@@ -16,7 +20,7 @@ export function isValidDateString(value) {
   const month = Number(value.slice(5, 7));
   const day = Number(value.slice(8, 10));
 
-  if (month < 1 || month > 12) {
+  if (year < 1 || month < 1 || month > 12) {
     return false;
   }
 

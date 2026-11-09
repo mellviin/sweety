@@ -8,6 +8,7 @@ import {
   rejectPrototypeKeys,
   requireJsonContentType,
 } from "./middleware/httpHardening.js";
+import { strictFields } from "./middleware/strictFields.js";
 import authRouter from "./routes/auth.js";
 import reportsRouter from "./routes/reports.js";
 import readingsRouter from "./routes/readings.js";
@@ -54,11 +55,16 @@ export function createApp() {
   app.use(["/auth", "/readings", "/reports"], requireJsonContentType);
   app.use(express.json({ limit: "10kb" }));
   app.use(rejectPrototypeKeys);
-  app.use(hpp());
+  app.use(hpp({ checkQuery: false }));
 
-  app.get("/health", (_request, response) => {
-    response.json({ status: "ok" });
-  });
+  app.get(
+    "/health",
+    strictFields("body", []),
+    strictFields("query", []),
+    (_request, response) => {
+      response.json({ status: "ok" });
+    },
+  );
 
   app.use("/auth", authRouter);
   app.use("/readings", readingsRouter);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticateToken } from "../middleware/auth.js";
 import { readingWriteRateLimiter } from "../middleware/rateLimit.js";
+import { strictFields } from "../middleware/strictFields.js";
 import {
   create,
   get,
@@ -12,10 +13,33 @@ import {
 const router = Router();
 
 router.use(authenticateToken);
-router.post("/", readingWriteRateLimiter, create);
-router.get("/", list);
-router.get("/:id", get);
-router.put("/:id", readingWriteRateLimiter, update);
-router.delete("/:id", readingWriteRateLimiter, remove);
+router.post(
+  "/",
+  strictFields("body", ["date", "slot", "value"]),
+  strictFields("query", []),
+  readingWriteRateLimiter,
+  create,
+);
+router.get(
+  "/",
+  strictFields("body", []),
+  strictFields("query", ["date", "page", "limit"]),
+  list,
+);
+router.get("/:id", strictFields("body", []), strictFields("query", []), get);
+router.put(
+  "/:id",
+  strictFields("body", ["date", "slot", "value"]),
+  strictFields("query", []),
+  readingWriteRateLimiter,
+  update,
+);
+router.delete(
+  "/:id",
+  strictFields("body", []),
+  strictFields("query", []),
+  readingWriteRateLimiter,
+  remove,
+);
 
 export default router;

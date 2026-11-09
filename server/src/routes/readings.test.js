@@ -243,6 +243,25 @@ describe("POST /readings", () => {
 
     expectValidation(response, 409, "date", "You can add only 4 readings per day.");
   });
+
+  test.each(["user_id", "userId"])(
+    "rejects a client-supplied %s field",
+    async (field) => {
+      const response = await createReading({
+        date: today,
+        slot: slots[0],
+        value: 120,
+        [field]: 2,
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toBe("Please enter a valid request.");
+      const readings = await request(app)
+        .get("/readings")
+        .set(authHeader(userBToken));
+      expect(readings.body.total).toBe(0);
+    },
+  );
 });
 
 describe("GET /readings", () => {
@@ -292,6 +311,22 @@ describe("GET /readings", () => {
     expect(badPage.body.error.field).toBe("page");
     expect(badLimit.status).toBe(400);
     expect(badLimit.body.error.field).toBe("limit");
+  });
+
+  test.each([
+    ["/readings?page=10001", "page"],
+    ["/readings?limit=0", "limit"],
+    ["/readings?date=2026-10-15&date=2026-10-16", "date"],
+    ["/readings?unexpected=1", null],
+  ])("rejects malformed or out-of-range query %s", async (path, field) => {
+    const response = await request(app).get(path).set(authHeader());
+
+    expect(response.status).toBe(400);
+    if (field) {
+      expect(response.body.error.field).toBe(field);
+    } else {
+      expect(response.body.error.message).toBe("Please enter a valid request.");
+    }
   });
 
   test("does not include another user's readings", async () => {
@@ -364,6 +399,17 @@ describe("reading ownership and updates", () => {
     expectNotFound(response);
   });
 
+  test.each(["1;DROP", "-1", "0", "1e3", "9".repeat(100)])(
+    "rejects malformed reading id %s",
+    async (id) => {
+      const response = await request(app)
+        .get(`/readings/${id}`)
+        .set(authHeader());
+
+      expectNotFound(response);
+    },
+  );
+
   test("edits a reading without treating its own slot as a duplicate", async () => {
     const created = await createReading({ date: today, slot: slots[0], value: 120 });
     const response = await request(app)
@@ -411,6 +457,51 @@ describe("reading ownership and updates", () => {
     expect(response.status).toBe(200);
     expect(response.body.date).toBe(today);
     expect(response.body.slot).toBe(slots[3]);
+  });
+});
+
+describe("malformed reading payloads", () => {
+  test("never returns 500 for 51 malformed create and update payloads", async () => {
+    const created = await createReading({
+      date: today,
+      slot: slots[0],
+      value: 120,
+    });
+
+    for (let index = 0; index < 51; index += 1) {
+      const malformed = {
+        date: { value: index },
+        slot: [slots[0]],
+        value: { $gt: 0 },
+      };
+      const createResponse = await createReading(malformed);
+      const updateResponse = await request(app)
+        .put(`/readings/${created.body.id}`)
+        .set(authHeader())
+        .send(malformed);
+
+      expect(createResponse.status).toBe(400);
+      expect(updateResponse.status).toBe(400);
+    }
+  });
+});
+
+describe("date input fuzzing", () => {
+  test.each([
+    "99999-01-01",
+    "2026-13-45",
+    "2026-02-30",
+    "２０２６-０１-０１",
+    "x".repeat(5000),
+    "2026-01-01\u0000",
+  ])("does not fail with a server error for date %s", async (date) => {
+    const response = await createReading({
+      date,
+      slot: slots[0],
+      value: 120,
+    });
+
+    expect(response.status).toBe(400);
   });
 });
 

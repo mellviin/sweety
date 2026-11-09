@@ -14,15 +14,6 @@ const slotLabels = {
   AFTER_DINNER: "After dinner",
 };
 
-const slotOrder = `
-  CASE slot
-    WHEN 'MORNING_FASTING' THEN 1
-    WHEN 'AFTER_BREAKFAST' THEN 2
-    WHEN 'AFTER_LUNCH' THEN 3
-    WHEN 'AFTER_DINNER' THEN 4
-  END
-`;
-
 export async function getDailyReport(userId, query) {
   const date = validateReportDate(query.date);
   const summary = await getSummary(userId, date, date);
@@ -30,7 +21,12 @@ export async function getDailyReport(userId, query) {
     `SELECT slot, value
      FROM readings
      WHERE user_id = $1 AND reading_date >= $2 AND reading_date <= $3
-     ORDER BY ${slotOrder}`,
+     ORDER BY CASE slot
+       WHEN 'MORNING_FASTING' THEN 1
+       WHEN 'AFTER_BREAKFAST' THEN 2
+       WHEN 'AFTER_LUNCH' THEN 3
+       WHEN 'AFTER_DINNER' THEN 4
+     END`,
     [userId, date, date],
   );
 
@@ -61,7 +57,12 @@ export async function getChartReadings(userId, query) {
     `SELECT reading_date AS date, slot, value
      FROM readings
      WHERE user_id = $1 AND reading_date >= $2 AND reading_date <= $3
-     ORDER BY reading_date, ${slotOrder}`,
+     ORDER BY reading_date, CASE slot
+       WHEN 'MORNING_FASTING' THEN 1
+       WHEN 'AFTER_BREAKFAST' THEN 2
+       WHEN 'AFTER_LUNCH' THEN 3
+       WHEN 'AFTER_DINNER' THEN 4
+     END`,
     [userId, firstOfMonth(date), date],
   );
 

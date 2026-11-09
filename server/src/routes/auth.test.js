@@ -116,6 +116,40 @@ describe("POST /auth/register", () => {
     expect(longName.body.error.field).toBe("name");
   });
 
+  test("rejects 51 malformed registration payloads without server errors", async () => {
+    for (let index = 0; index < 51; index += 1) {
+      const response = await request(app)
+        .post("/auth/register")
+        .send({
+          name: { malformed: index },
+          email: [index],
+          password: { value: index },
+        });
+
+      expect(response.status).toBe(400);
+    }
+  });
+
+  test("rejects extra registration fields", async () => {
+    const response = await request(app)
+      .post("/auth/register")
+      .send({ ...userInput, role: "admin" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toBe("Please enter a valid request.");
+  });
+
+  test("rejects a 10,000-character email before validation regexes run", async () => {
+    const startedAt = performance.now();
+    const response = await request(app)
+      .post("/auth/register")
+      .send({ ...userInput, email: `${"a".repeat(10_000)}@example.com` });
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(response.status).toBe(400);
+    expect(elapsedMs).toBeLessThan(100);
+  });
+
   test("never includes password_hash in authentication responses", async () => {
     const registration = await request(app)
       .post("/auth/register")

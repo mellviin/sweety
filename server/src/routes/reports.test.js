@@ -280,6 +280,27 @@ describe("report validation and ownership", () => {
     });
   });
 
+  test.each([
+    "/reports/daily?date=99999-01-01",
+    "/reports/daily?date=2026-13-45",
+    "/reports/daily?date=2026-02-30",
+    "/reports/daily?date=%EF%BC%92%EF%BC%90%EF%BC%92%EF%BC%96-01-01",
+    `/reports/daily?date=${"x".repeat(5000)}`,
+    "/reports/daily?date=2026-01-01%00",
+    "/reports/daily?date=2026-01-01&date=2026-01-02",
+  ])("does not return 500 for malformed report date %s", async (path) => {
+    const response = await getReport(path);
+
+    expect(response.status).toBe(400);
+  });
+
+  test("rejects unrecognized report query fields", async () => {
+    const response = await getReport("/reports/daily?user_id=2&date=2026-10-15");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toBe("Please enter a valid request.");
+  });
+
   test("requires authentication", async () => {
     const response = await request(app)
       .get("/reports/daily?date=2026-10-15");

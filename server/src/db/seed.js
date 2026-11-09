@@ -89,17 +89,17 @@ export async function seedDemoData(database = pool) {
     await client.query("DELETE FROM readings WHERE user_id = $1", [userId]);
 
     if (seededReadings.length > 0) {
-      const values = [];
-      const placeholders = seededReadings.map((reading, index) => {
-        const parameter = index * 4;
-        values.push(userId, reading.date, reading.slot, reading.value);
-        return `($${parameter + 1}, $${parameter + 2}, $${parameter + 3}, $${parameter + 4})`;
-      });
-
       await client.query(
         `INSERT INTO readings (user_id, reading_date, slot, value)
-         VALUES ${placeholders.join(", ")}`,
-        values,
+         SELECT $1, reading_date, slot, value
+         FROM unnest($2::date[], $3::text[], $4::integer[])
+           AS reading(reading_date, slot, value)`,
+        [
+          userId,
+          seededReadings.map(({ date }) => date),
+          seededReadings.map(({ slot }) => slot),
+          seededReadings.map(({ value }) => value),
+        ],
       );
     }
 

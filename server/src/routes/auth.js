@@ -13,12 +13,16 @@ import {
   failedLoginRateLimiter,
 } from "../middleware/rateLimit.js";
 import { validateRequest } from "../middleware/validate.js";
+import { strictFields } from "../middleware/strictFields.js";
 import { getPasswordValidationMessage } from "../services/passwordPolicy.js";
 
 const router = Router();
 
 const emailValidation = body("email")
   .isString()
+  .withMessage("Email must be valid.")
+  .bail()
+  .isLength({ max: 254 })
   .withMessage("Email must be valid.")
   .bail()
   .trim()
@@ -29,6 +33,8 @@ const emailValidation = body("email")
 
 router.post(
   "/register",
+  strictFields("body", ["name", "email", "password"]),
+  strictFields("query", []),
   authRateLimiter,
   body("name")
     .isString()
@@ -45,9 +51,15 @@ router.post(
     .isLength({ min: 8 })
     .withMessage("Password must be at least 8 characters."),
   body("password").custom((password, { req }) => {
+    const name = typeof req.body.name === "string"
+      ? req.body.name.trim()
+      : undefined;
+    const email = typeof req.body.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : undefined;
     const message = getPasswordValidationMessage(password, {
-      name: req.body.name?.trim(),
-      email: req.body.email?.trim().toLowerCase(),
+      name,
+      email,
     });
     if (message) {
       throw new Error(message);
@@ -60,6 +72,8 @@ router.post(
 
 router.post(
   "/login",
+  strictFields("body", ["email", "password"]),
+  strictFields("query", []),
   authRateLimiter,
   emailValidation,
   body("password")
@@ -70,10 +84,24 @@ router.post(
   login,
 );
 
-router.get("/me", authenticateToken, me);
-router.post("/logout", authenticateToken, logout);
+router.get(
+  "/me",
+  strictFields("body", []),
+  strictFields("query", []),
+  authenticateToken,
+  me,
+);
+router.post(
+  "/logout",
+  strictFields("body", []),
+  strictFields("query", []),
+  authenticateToken,
+  logout,
+);
 router.post(
   "/change-password",
+  strictFields("body", ["currentPassword", "newPassword"]),
+  strictFields("query", []),
   authenticateToken,
   body("currentPassword")
     .isString()

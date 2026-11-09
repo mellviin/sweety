@@ -122,6 +122,8 @@ Do not use the example JWT value outside local development. Replace it with a st
 | `READING_WRITE_RATE_LIMIT_MAX` / `READING_WRITE_RATE_LIMIT_WINDOW_MS` | POST/PUT/DELETE readings per authenticated user and the window in milliseconds. | `60` / `900000` |
 | `RATE_LIMIT_ENABLED` | Explicitly enables rate limits under `NODE_ENV=test`; production/development limits are enabled by default. | `false` |
 
+API request bodies and query strings use strict allow-lists: unknown fields are rejected with HTTP 400. Reading ownership is always taken from the verified access token; client-supplied `user_id` or `userId` fields are not accepted.
+
 ### Client variables
 
 | Variable | Purpose | Default/example |

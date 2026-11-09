@@ -11,15 +11,6 @@ const slotLabels = {
 
 const slots = Object.keys(slotLabels);
 
-const readingColumns = `
-  id,
-  reading_date,
-  slot,
-  value,
-  created_at,
-  updated_at
-`;
-
 export async function createReading(userId, input) {
   const reading = validateReadingInput(input);
   await validateDateConflicts(userId, reading.date, reading.slot);
@@ -28,7 +19,7 @@ export async function createReading(userId, input) {
     const result = await pool.query(
       `INSERT INTO readings (user_id, reading_date, slot, value)
        VALUES ($1, $2, $3, $4)
-       RETURNING ${readingColumns}`,
+       RETURNING id, reading_date, slot, value, created_at, updated_at`,
       [userId, reading.date, reading.slot, reading.value],
     );
 
@@ -44,26 +35,18 @@ export async function createReading(userId, input) {
 
 export async function listReadings(userId, query) {
   const { date, page, limit } = validateListQuery(query);
-  const parameters = [userId];
-  let dateFilter = "";
-
-  if (date !== undefined) {
-    parameters.push(date);
-    dateFilter = ` AND reading_date = $${parameters.length}`;
-  }
-
   const countResult = await pool.query(
     `SELECT count(*)::int AS total
      FROM readings
-     WHERE user_id = $1${dateFilter}`,
-    parameters,
+     WHERE user_id = $1 AND ($2::date IS NULL OR reading_date = $2)`,
+    [userId, date ?? null],
   );
   const total = countResult.rows[0].total;
   const offset = (page - 1) * limit;
   const result = await pool.query(
-    `SELECT ${readingColumns}
+    `SELECT id, reading_date, slot, value, created_at, updated_at
      FROM readings
-     WHERE user_id = $1${dateFilter}
+     WHERE user_id = $1 AND ($2::date IS NULL OR reading_date = $2)
      ORDER BY reading_date DESC,
        CASE slot
          WHEN 'MORNING_FASTING' THEN 1
@@ -71,9 +54,9 @@ export async function listReadings(userId, query) {
          WHEN 'AFTER_LUNCH' THEN 3
          WHEN 'AFTER_DINNER' THEN 4
        END
-     LIMIT $${parameters.length + 1}
-     OFFSET $${parameters.length + 2}`,
-    [...parameters, limit, offset],
+     LIMIT $3
+     OFFSET $4`,
+    [userId, date ?? null, limit, offset],
   );
 
   return {
@@ -87,7 +70,7 @@ export async function listReadings(userId, query) {
 export async function getReading(userId, readingId) {
   const id = parseReadingId(readingId);
   const result = await pool.query(
-    `SELECT ${readingColumns}
+    `SELECT id, reading_date, slot, value, created_at, updated_at
      FROM readings
      WHERE id = $1 AND user_id = $2`,
     [id, userId],
@@ -112,7 +95,7 @@ export async function updateReading(userId, readingId, input) {
       `UPDATE readings
        SET reading_date = $1, slot = $2, value = $3, updated_at = now()
        WHERE id = $4 AND user_id = $5
-       RETURNING ${readingColumns}`,
+       RETURNING id, reading_date, slot, value, created_at, updated_at`,
       [reading.date, reading.slot, reading.value, id, userId],
     );
 
@@ -174,7 +157,12 @@ function parseGlucoseValue(value) {
     return Number.isSafeInteger(value) ? value : null;
   }
 
-  if (typeof value !== "string" || !/^\d+$/.test(value.trim())) {
+  if (
+    typeof value !== "string"
+    || value.trim().length === 0
+    || value.trim().length > 3
+    || !/^\d+$/.test(value.trim())
+  ) {
     return null;
   }
 
@@ -189,7 +177,7 @@ function validateListQuery(query = {}) {
   }
 
   const page = parsePositiveInteger(query.page, 1);
-  if (page === null) {
+  if (page === null || page > 10_000) {
     throw validationError("page", "Page must be a whole number greater than or equal to 1.");
   }
 
@@ -206,7 +194,11 @@ function parsePositiveInteger(value, defaultValue) {
     return defaultValue;
   }
 
-  if (typeof value !== "string" || !/^\d+$/.test(value)) {
+  if (
+    typeof value !== "string"
+    || value.length > 5
+    || !/^\d+$/.test(value)
+  ) {
     return null;
   }
 
@@ -215,15 +207,12 @@ function parsePositiveInteger(value, defaultValue) {
 }
 
 async function validateDateConflicts(userId, date, slot, excludedId) {
-  const idFilter = excludedId === undefined ? "" : " AND id <> $3";
-  const parameters = excludedId === undefined
-    ? [userId, date]
-    : [userId, date, excludedId];
   const countResult = await pool.query(
     `SELECT count(*)::int AS total
      FROM readings
-     WHERE user_id = $1 AND reading_date = $2${idFilter}`,
-    parameters,
+     WHERE user_id = $1 AND reading_date = $2
+       AND ($3::integer IS NULL OR id <> $3)`,
+    [userId, date, excludedId ?? null],
   );
 
   if (countResult.rows[0].total >= 4) {
@@ -234,11 +223,9 @@ async function validateDateConflicts(userId, date, slot, excludedId) {
     `SELECT 1
      FROM readings
      WHERE user_id = $1 AND reading_date = $2 AND slot = $3
-       ${excludedId === undefined ? "" : "AND id <> $4"}
+       AND ($4::integer IS NULL OR id <> $4)
      LIMIT 1`,
-    excludedId === undefined
-      ? [userId, date, slot]
-      : [userId, date, slot, excludedId],
+    [userId, date, slot, excludedId ?? null],
   );
 
   if (duplicateResult.rowCount > 0) {
@@ -270,7 +257,11 @@ function formatReading(row) {
 }
 
 function parseReadingId(value) {
-  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+  if (
+    typeof value !== "string"
+    || value.length > 16
+    || !/^[1-9]\d*$/.test(value)
+  ) {
     throw readingNotFoundError();
   }
 
