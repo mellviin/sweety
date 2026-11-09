@@ -108,7 +108,7 @@ export default function Reports() {
           />
         ))}
         <Suspense fallback={<div className="report-card chart-card"><Spinner label="Loading chart" /></div>}>
-          <LazyReportChart state={chart} />
+          <LazyReportChart state={chart} selectedDate={date} />
         </Suspense>
       </section>
     </main>
