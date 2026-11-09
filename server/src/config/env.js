@@ -34,9 +34,26 @@ export const config = {
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   appTimezone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
+  rateLimitsEnabled: process.env.RATE_LIMIT_ENABLED === "true",
+  globalRateLimitMax: Number(process.env.GLOBAL_RATE_LIMIT_MAX ?? 300),
+  globalRateLimitWindowMs: Number(
+    process.env.GLOBAL_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000,
+  ),
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 20),
   authRateLimitWindowMs: Number(
     process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000,
+  ),
+  loginFailureRateLimitMax: Number(
+    process.env.LOGIN_FAILURE_RATE_LIMIT_MAX ?? 5,
+  ),
+  loginFailureRateLimitWindowMs: Number(
+    process.env.LOGIN_FAILURE_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000,
+  ),
+  readingWriteRateLimitMax: Number(
+    process.env.READING_WRITE_RATE_LIMIT_MAX ?? 60,
+  ),
+  readingWriteRateLimitWindowMs: Number(
+    process.env.READING_WRITE_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000,
   ),
 };
 

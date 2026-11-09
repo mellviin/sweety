@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import request from "supertest";
 import app from "../app.js";
+import { config } from "../config/env.js";
 import { getMigrationPool, pool } from "../db/pool.js";
 import { runMigrations } from "../db/migrate.js";
 
@@ -147,6 +148,104 @@ describe("POST /auth/login", () => {
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
       error: { field: null, message: "Invalid email or password." },
+    });
+  });
+
+  describe("rate limiting", () => {
+    const originalRateLimitEnabled = config.rateLimitsEnabled;
+    const originalAuthLimit = config.authRateLimitMax;
+    const originalFailureLimit = config.loginFailureRateLimitMax;
+    const originalFailureWindow = config.loginFailureRateLimitWindowMs;
+
+    beforeAll(() => {
+      config.rateLimitsEnabled = true;
+      config.loginFailureRateLimitMax = 5;
+      config.loginFailureRateLimitWindowMs = 500;
+    });
+
+    afterAll(() => {
+      config.rateLimitsEnabled = originalRateLimitEnabled;
+      config.authRateLimitMax = originalAuthLimit;
+      config.loginFailureRateLimitMax = originalFailureLimit;
+      config.loginFailureRateLimitWindowMs = originalFailureWindow;
+    });
+
+    test("the sixth failed login is limited, but another email is unaffected", async () => {
+      const email = `blocked-${Date.now()}@example.com`;
+      const failures = [];
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        failures.push(await request(app)
+          .post("/auth/login")
+          .send({ email, password: "wrong-password" }));
+      }
+
+      const blocked = await request(app)
+        .post("/auth/login")
+        .send({ email, password: "wrong-password" });
+      const otherEmail = await request(app)
+        .post("/auth/login")
+        .send({ email: `other-${Date.now()}@example.com`, password: "wrong-password" });
+
+      expect(failures.map(({ status }) => status)).toEqual([401, 401, 401, 401, 401]);
+      expect(failures[0].body).toEqual({
+        error: { field: null, message: "Invalid email or password." },
+      });
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers["retry-after"]).toMatch(/^\d+$/);
+      expect(blocked.body.error.message).toBe(
+        "Too many requests. Please try again later.",
+      );
+      expect(otherEmail.status).toBe(401);
+      expect(otherEmail.body.error.message).toBe("Invalid email or password.");
+    });
+
+    test("failed-login limit resets after its configured window", async () => {
+      const email = `reset-${Date.now()}@example.com`;
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const response = await request(app)
+          .post("/auth/login")
+          .send({ email, password: "wrong-password" });
+        expect(response.status).toBe(401);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 525));
+
+      const afterWindow = await request(app)
+        .post("/auth/login")
+        .send({ email, password: "wrong-password" });
+      expect(afterWindow.status).toBe(401);
+      expect(afterWindow.body.error.message).toBe("Invalid email or password.");
+    });
+
+    test("the auth endpoint limiter has a configurable limit in test mode", async () => {
+      const previousTrustProxy = app.get("trust proxy");
+      config.authRateLimitMax = 2;
+      app.set("trust proxy", 1);
+      const clientIp = "192.0.2.42";
+      const email = `auth-limit-${Date.now()}@example.com`;
+      try {
+        const first = await request(app)
+          .post("/auth/login")
+          .set("X-Forwarded-For", clientIp)
+          .send({ email, password: "wrong-password" });
+        const second = await request(app)
+          .post("/auth/login")
+          .set("X-Forwarded-For", clientIp)
+          .send({ email: `auth-second-${Date.now()}@example.com`, password: "wrong-password" });
+        const limited = await request(app)
+          .post("/auth/login")
+          .set("X-Forwarded-For", clientIp)
+          .send({ email: `auth-third-${Date.now()}@example.com`, password: "wrong-password" });
+
+        expect(first.status).toBe(401);
+        expect(second.status).toBe(401);
+        expect(limited.status).toBe(429);
+        expect(limited.headers["retry-after"]).toMatch(/^\d+$/);
+      } finally {
+        app.set("trust proxy", previousTrustProxy);
+      }
     });
   });
 });

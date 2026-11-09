@@ -48,6 +48,40 @@ afterAll(async () => {
 });
 
 describe("POST /readings", () => {
+  test("write limits apply per authenticated user and return Retry-After", async () => {
+    const previousEnabled = config.rateLimitsEnabled;
+    const previousLimit = config.readingWriteRateLimitMax;
+    config.rateLimitsEnabled = true;
+    config.readingWriteRateLimitMax = 1;
+
+    try {
+      const firstUserWrite = await createReading({
+        date: today,
+        slot: slots[0],
+        value: 120,
+      });
+      const secondUserWrite = await createReading({
+        date: today,
+        slot: slots[0],
+        value: 121,
+      }, userBToken);
+      const limitedUserWrite = await createReading({
+        date: today,
+        slot: slots[1],
+        value: 122,
+      });
+
+      expect(firstUserWrite.status).toBe(201);
+      expect(secondUserWrite.status).toBe(201);
+      expect(limitedUserWrite.status).toBe(429);
+      expect(limitedUserWrite.headers["retry-after"]).toMatch(/^\d+$/);
+      expect(limitedUserWrite.body.error.field).toBeNull();
+    } finally {
+      config.rateLimitsEnabled = previousEnabled;
+      config.readingWriteRateLimitMax = previousLimit;
+    }
+  });
+
   test("creates a reading with the specified response shape", async () => {
     const response = await createReading({
       date: today,

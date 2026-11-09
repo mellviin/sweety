@@ -2,6 +2,7 @@ import express from "express";
 import { jest } from "@jest/globals";
 import request from "supertest";
 import app, { createApp } from "./app.js";
+import { config } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 describe("API app", () => {
@@ -199,5 +200,35 @@ describe("API app", () => {
     );
 
     expect(responses.every((response) => response.status === 400)).toBe(true);
+  });
+
+  test("global rate limiting can be enabled in test mode and returns Retry-After", async () => {
+    const previousEnabled = config.rateLimitsEnabled;
+    const previousLimit = config.globalRateLimitMax;
+    const previousTrustProxy = app.get("trust proxy");
+    config.rateLimitsEnabled = true;
+    config.globalRateLimitMax = 1;
+    app.set("trust proxy", 1);
+
+    try {
+      const clientIp = "192.0.2.21";
+      expect((await request(app).get("/health")
+        .set("X-Forwarded-For", clientIp)).status).toBe(200);
+      const limited = await request(app).get("/health")
+        .set("X-Forwarded-For", clientIp);
+
+      expect(limited.status).toBe(429);
+      expect(limited.headers["retry-after"]).toMatch(/^\d+$/);
+      expect(limited.body).toEqual({
+        error: {
+          field: null,
+          message: "Too many requests. Please try again later.",
+        },
+      });
+    } finally {
+      config.rateLimitsEnabled = previousEnabled;
+      config.globalRateLimitMax = previousLimit;
+      app.set("trust proxy", previousTrustProxy);
+    }
   });
 });

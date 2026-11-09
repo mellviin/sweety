@@ -10,7 +10,7 @@
 - Passwords use bcrypt with 12 rounds, and authentication integration tests use only the database configured by `TEST_DATABASE_URL`.
 - Reading validation checks the four-per-date maximum before checking for a duplicate slot, so a fifth reading reports the daily limit even when its slot also exists.
 - Demo seed readings are deterministic and span the 21 days ending yesterday, plus a reading on the last day of the previous month relative to yesterday when that day is outside the 21-day range.
-- The authentication rate limit defaults to 20 requests per IP per 15 minutes and is disabled when `NODE_ENV=test`.
+- Global API traffic defaults to 300 requests per IP per 15 minutes, auth endpoints to 20 per IP, failed logins to 5 per SHA-256 email hash, and reading writes to 60 per authenticated user. Limits are disabled under `NODE_ENV=test` unless `RATE_LIMIT_ENABLED=true`.
 - The React client uses the Vite development proxy at `/api`, which strips that prefix and forwards requests to `http://localhost:3000` by default.
 - The client persists the JWT in browser local storage so a logged-in session can be restored after a page reload.
 - The Dashboard date picker defaults to the configured application timezone's current date; changing it also resets the reading form and exits edit mode to avoid editing an item from a different selected day.

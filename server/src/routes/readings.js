@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "../middleware/auth.js";
+import { readingWriteRateLimiter } from "../middleware/rateLimit.js";
 import {
   create,
   get,
@@ -11,10 +12,10 @@ import {
 const router = Router();
 
 router.use(authenticateToken);
-router.post("/", create);
+router.post("/", readingWriteRateLimiter, create);
 router.get("/", list);
 router.get("/:id", get);
-router.put("/:id", update);
-router.delete("/:id", remove);
+router.put("/:id", readingWriteRateLimiter, update);
+router.delete("/:id", readingWriteRateLimiter, remove);
 
 export default router;

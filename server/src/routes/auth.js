@@ -2,6 +2,10 @@ import { Router } from "express";
 import { body } from "express-validator";
 import { login, me, register } from "../controllers/authController.js";
 import { authenticateToken } from "../middleware/auth.js";
+import {
+  authRateLimiter,
+  failedLoginRateLimiter,
+} from "../middleware/rateLimit.js";
 import { validateRequest } from "../middleware/validate.js";
 
 const router = Router();
@@ -18,6 +22,7 @@ const emailValidation = body("email")
 
 router.post(
   "/register",
+  authRateLimiter,
   body("name")
     .isString()
     .withMessage("Name is required.")
@@ -38,11 +43,13 @@ router.post(
 
 router.post(
   "/login",
+  authRateLimiter,
   emailValidation,
   body("password")
     .isString()
     .withMessage("Invalid email or password."),
   validateRequest,
+  failedLoginRateLimiter,
   login,
 );
 

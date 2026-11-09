@@ -116,6 +116,10 @@ Do not use the example JWT value outside local development. Replace it with a st
 | `APP_TIMEZONE` | IANA timezone used for the app's current-date and future-date checks. | `Asia/Kolkata` |
 | `AUTH_RATE_LIMIT_MAX` | Maximum auth requests per IP during the rate-limit window. | `20` |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | Auth rate-limit window in milliseconds. | `900000` (15 minutes) |
+| `GLOBAL_RATE_LIMIT_MAX` / `GLOBAL_RATE_LIMIT_WINDOW_MS` | Requests per IP across the API and the limit window in milliseconds. | `300` / `900000` |
+| `LOGIN_FAILURE_RATE_LIMIT_MAX` / `LOGIN_FAILURE_RATE_LIMIT_WINDOW_MS` | Failed logins per SHA-256 email hash and the rolling window in milliseconds. | `5` / `900000` |
+| `READING_WRITE_RATE_LIMIT_MAX` / `READING_WRITE_RATE_LIMIT_WINDOW_MS` | POST/PUT/DELETE readings per authenticated user and the window in milliseconds. | `60` / `900000` |
+| `RATE_LIMIT_ENABLED` | Explicitly enables rate limits under `NODE_ENV=test`; production/development limits are enabled by default. | `false` |
 
 ### Client variables
 
@@ -312,4 +316,5 @@ Screenshots are not included yet. Add images under `docs/screenshots/` and link 
 - Never commit `.env` files or production credentials. Every example secret/password is a placeholder.
 - Docker Compose is for local development; its database port is bound to localhost. Use a managed secrets mechanism and network controls for deployments.
 - Set `TRUST_PROXY` only to match the trusted reverse proxy topology. Leave it unset/off when the API is directly reachable; trusting arbitrary forwarded headers can undermine IP-based rate limiting.
+- Failed-login email keys are SHA-256 hashes held in process memory for the configured window. With multiple API instances, use a shared rate-limit store to enforce consistent limits across instances.
 - Jest truncates test tables. Set `TEST_DATABASE_URL` to the dedicated test database, never to a database with data you need.

@@ -11,7 +11,7 @@ import {
 import authRouter from "./routes/auth.js";
 import reportsRouter from "./routes/reports.js";
 import readingsRouter from "./routes/readings.js";
-import { authRateLimiter } from "./middleware/rateLimit.js";
+import { globalRateLimiter } from "./middleware/rateLimit.js";
 import hpp from "hpp";
 
 export function createApp() {
@@ -50,6 +50,7 @@ export function createApp() {
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Authorization", "Content-Type"],
   }));
+  app.use(globalRateLimiter);
   app.use(["/auth", "/readings", "/reports"], requireJsonContentType);
   app.use(express.json({ limit: "10kb" }));
   app.use(rejectPrototypeKeys);
@@ -59,7 +60,7 @@ export function createApp() {
     response.json({ status: "ok" });
   });
 
-  app.use("/auth", authRateLimiter, authRouter);
+  app.use("/auth", authRouter);
   app.use("/readings", readingsRouter);
   app.use("/reports", reportsRouter);
   app.use(notFoundHandler);
