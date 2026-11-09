@@ -277,7 +277,25 @@ Each summary returns `from`, `to`, `count`, `highest`, `lowest`, and `average`. 
 
 ## Screenshots
 
-Screenshots are not included yet. Add images under `docs/screenshots/` and link them here when ready (for example, `docs/screenshots/dashboard.png`, `docs/screenshots/reports.png`).
+### Dashboard
+
+![Sweety dashboard showing the seeded demo readings and entry form](docs/screenshots/dashboard.png)
+
+### Login
+
+![Sweety login form](docs/screenshots/login.png)
+
+### Registration
+
+![Sweety account registration form](docs/screenshots/register.png)
+
+### Reports
+
+![Sweety reports with daily, monthly, and chart summaries](docs/screenshots/reports.png)
+
+### Profile
+
+![Sweety profile page with the change-password form](docs/screenshots/profile.png)
 
 ## Notes and assumptions
 
