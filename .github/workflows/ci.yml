@@ -7,28 +7,44 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sweety
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sweety"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sweety
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sweety_test
-      JWT_SECRET: ci-only-signing-key-not-for-production
-      NODE_ENV: development
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Start and provision PostgreSQL
+        run: |
+          postgres_password="$(openssl rand -hex 32)"
+          app_password="$(openssl rand -hex 32)"
+          migrate_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$postgres_password"
+          echo "::add-mask::$app_password"
+          echo "::add-mask::$migrate_password"
+          docker run --detach \
+            --name sweety-ci-postgres \
+            --publish 5432:5432 \
+            --env POSTGRES_USER=postgres \
+            --env POSTGRES_PASSWORD="$postgres_password" \
+            --env APP_DB_PASSWORD="$app_password" \
+            --env MIGRATE_DB_PASSWORD="$migrate_password" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/server/src/db/init/001_create_databases.sql,target=/docker-entrypoint-initdb.d/001_create_databases.sql,readonly" \
+            postgres:16
+          ready=0
+          for attempt in $(seq 1 60); do
+            if docker logs sweety-ci-postgres 2>&1 | grep -q "PostgreSQL init process complete"; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1
+          {
+            echo "POSTGRES_PASSWORD=$postgres_password"
+            echo "APP_DB_PASSWORD=$app_password"
+            echo "MIGRATE_DB_PASSWORD=$migrate_password"
+            echo "DATABASE_URL=postgresql://sweety_app:$app_password@localhost:5432/sweety"
+            echo "MIGRATION_DATABASE_URL=postgresql://sweety_migrate:$migrate_password@localhost:5432/sweety"
+            echo "TEST_DATABASE_URL=postgresql://sweety_app:$app_password@localhost:5432/sweety_test"
+          } >> "$GITHUB_ENV"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -42,14 +58,6 @@ jobs:
       - name: Install client dependencies
         working-directory: client
         run: npm ci
-
-      - name: Create test database
-        run: |
-          PGPASSWORD=postgres psql \
-            --host localhost \
-            --username postgres \
-            --dbname postgres \
-            --command "CREATE DATABASE sweety_test;"
 
       - name: Apply database migrations
         working-directory: server

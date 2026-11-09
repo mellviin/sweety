@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 import { fileURLToPath } from "node:url";
 import { config } from "../config/env.js";
 import { pool } from "./pool.js";
-import { runMigrations } from "./migrate.js";
 import {
   previousMonthRange,
   todayInTimezone,
@@ -27,8 +26,6 @@ const slotRanges = [
 ];
 
 export async function seedDemoData(database = pool) {
-  await runMigrations(database);
-
   const yesterday = shiftDate(todayInTimezone(config.appTimezone), -1);
   const recentDates = Array.from({ length: 21 }, (_value, index) =>
     shiftDate(yesterday, index - 20));

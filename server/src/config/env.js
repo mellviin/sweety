@@ -13,6 +13,7 @@ dotenv.config({
 
 export const config = {
   databaseUrl: process.env.DATABASE_URL,
+  migrationDatabaseUrl: process.env.MIGRATION_DATABASE_URL,
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",

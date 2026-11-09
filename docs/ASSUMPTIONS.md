@@ -5,7 +5,7 @@
 - The server requires Node.js 20 or newer to use patched transitive `glob` and `minimatch` releases.
 - When both exist, `server/.env` values take precedence over root `.env` values.
 - `previousMonthRange(date)` returns inclusive `startDate` and `endDate` strings for the month preceding the date's month.
-- Docker Compose is for local development and uses PostgreSQL's trust authentication; do not expose this service outside a trusted local environment.
+- Docker Compose is for local development, binds PostgreSQL to localhost, and provisions separate app and migration roles.
 - Migrations do not create demo data; the seed command explicitly creates and refreshes the demo account and readings.
 - Passwords use bcrypt with 12 rounds, and authentication integration tests use only the database configured by `TEST_DATABASE_URL`.
 - Reading validation checks the four-per-date maximum before checking for a duplicate slot, so a fifth reading reports the daily limit even when its slot also exists.

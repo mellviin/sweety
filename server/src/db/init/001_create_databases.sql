@@ -1,2 +1,41 @@
-CREATE DATABASE sweety;
-CREATE DATABASE sweety_test;
+\getenv app_db_password APP_DB_PASSWORD
+\getenv migrate_db_password MIGRATE_DB_PASSWORD
+
+CREATE ROLE sweety_app
+  LOGIN PASSWORD :'app_db_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE sweety_migrate
+  LOGIN PASSWORD :'migrate_db_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE;
+
+CREATE DATABASE sweety OWNER sweety_migrate;
+CREATE DATABASE sweety_test OWNER sweety_migrate;
+
+GRANT CONNECT ON DATABASE sweety TO sweety_app;
+GRANT CONNECT ON DATABASE sweety_test TO sweety_app;
+
+\connect sweety
+REVOKE ALL ON DATABASE sweety FROM PUBLIC;
+REVOKE ALL ON pg_catalog.pg_shadow FROM PUBLIC;
+ALTER SCHEMA public OWNER TO sweety_migrate;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+CREATE SCHEMA sweety_meta AUTHORIZATION sweety_migrate;
+REVOKE ALL ON SCHEMA sweety_meta FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO sweety_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sweety_migrate IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sweety_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sweety_migrate IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO sweety_app;
+
+\connect sweety_test
+REVOKE ALL ON DATABASE sweety_test FROM PUBLIC;
+REVOKE ALL ON pg_catalog.pg_shadow FROM PUBLIC;
+ALTER SCHEMA public OWNER TO sweety_migrate;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+CREATE SCHEMA sweety_meta AUTHORIZATION sweety_migrate;
+REVOKE ALL ON SCHEMA sweety_meta FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO sweety_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sweety_migrate IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sweety_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sweety_migrate IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO sweety_app;

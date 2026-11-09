@@ -46,10 +46,23 @@ cd ..
 From the repository root, start PostgreSQL:
 
 ```sh
+cp .env.example .env
+# Replace all replace-with-* values with distinct, private values.
 docker compose up -d
 ```
 
-The PostgreSQL 16 container publishes port `5432`, persists its data in a named volume, and creates both `sweety` and `sweety_test` databases on first initialization. Check readiness with `docker compose ps`.
+The PostgreSQL 16 container binds port `5432` to localhost, persists its data in a named volume, and creates both `sweety` and `sweety_test` databases on first initialization. It requires `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, and `MIGRATE_DB_PASSWORD`; no password defaults are provided. Check readiness with `docker compose ps`.
+
+To recreate the development database and rerun the initialization script after changing role setup:
+
+```sh
+docker compose down --volumes
+docker compose up -d
+cd server
+npm run migrate
+```
+
+`docker compose down --volumes` permanently deletes the local PostgreSQL data volume. The initialization script runs only when PostgreSQL creates an empty data directory.
 
 ### Option B: Local PostgreSQL
 
@@ -60,7 +73,7 @@ CREATE DATABASE sweety;
 CREATE DATABASE sweety_test;
 ```
 
-Set the connection strings in `server/.env` to match the local PostgreSQL user, password, host, port, and database names.
+For local PostgreSQL, provision equivalent `sweety_app` and `sweety_migrate` roles and grants, then set the connection strings in `server/.env`. Use URL-encoded credentials if passwords contain reserved URL characters.
 
 ### Apply migrations
 
@@ -88,8 +101,12 @@ Do not use the example JWT value outside local development. Replace it with a st
 
 | Variable | Purpose | Default/example |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string used by the running API and migration/seed commands. | `postgresql://postgres@localhost:5432/sweety` |
-| `TEST_DATABASE_URL` | Dedicated PostgreSQL connection string used by Jest. Tests truncate user and reading tables in this database. | `postgresql://postgres@localhost:5432/sweety_test` |
+| `DATABASE_URL` | PostgreSQL connection string used by the API and seed command. | `postgresql://sweety_app:<password>@localhost:5432/sweety` |
+| `MIGRATION_DATABASE_URL` | Connection string for the schema-owning role, used by `npm run migrate` and test setup only. | `postgresql://sweety_migrate:<password>@localhost:5432/sweety` |
+| `TEST_DATABASE_URL` | Dedicated app-role connection string used by Jest; migrations are applied with `MIGRATION_DATABASE_URL`. | `postgresql://sweety_app:<password>@localhost:5432/sweety_test` |
+| `POSTGRES_PASSWORD` | Password for the PostgreSQL initialization superuser, used by Docker Compose. | Set a private value; no default. |
+| `APP_DB_PASSWORD` | Password for the least-privilege app role. | Set a private value. |
+| `MIGRATE_DB_PASSWORD` | Password for the schema-owning migration role. | Set a private value distinct from the app password. |
 | `JWT_SECRET` | Secret used to sign and verify API tokens. Required to start the API. | Replace the example value with a private random secret. |
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by `jsonwebtoken` (for example `1d`). | `1d` |
 | `NODE_ENV` | Node runtime mode; tests set this to `test`, which disables auth rate limiting and selects `TEST_DATABASE_URL`. | `development` |
@@ -129,7 +146,7 @@ Open [http://localhost:5173](http://localhost:5173). The Vite development server
 
 ## Run tests and lint
 
-The server test suite uses only `TEST_DATABASE_URL`; it applies migrations and clears test data between cases.
+The server test suite uses `TEST_DATABASE_URL` as `sweety_app` for application operations and the credentials in `MIGRATION_DATABASE_URL` against the test host/database for migrations and cleanup. Use only a disposable `sweety_test` database.
 
 ```sh
 cd server
@@ -156,7 +173,7 @@ From `server`, run:
 npm run seed
 ```
 
-The command applies migrations, creates or refreshes the demo account's readings, and prints the date range and count. Demo credentials:
+Run `npm run migrate` first. The seed command uses the app role to create or refresh demo data and prints the date range and count. Demo credentials:
 
 - Email: `demo@sweety.test`
 - Password: `Demo@1234`
@@ -291,6 +308,6 @@ Screenshots are not included yet. Add images under `docs/screenshots/` and link 
 
 ## Security and local-development notes
 
-- Never commit `.env` files or production credentials. The example JWT secret is a placeholder; CI uses a non-production test key.
-- Docker Compose is for trusted local development only and uses PostgreSQL trust authentication. Do not expose it to an untrusted network.
+- Never commit `.env` files or production credentials. Every example secret/password is a placeholder.
+- Docker Compose is for local development; its database port is bound to localhost. Use a managed secrets mechanism and network controls for deployments.
 - Jest truncates test tables. Set `TEST_DATABASE_URL` to the dedicated test database, never to a database with data you need.

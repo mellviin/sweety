@@ -15,7 +15,7 @@ describe("runMigrations", () => {
           };
         }
 
-        if (statement.startsWith("INSERT INTO schema_migrations")) {
+        if (statement.startsWith("INSERT INTO sweety_meta.schema_migrations")) {
           appliedMigrations.add(parameters[0]);
         }
 
@@ -32,9 +32,9 @@ describe("runMigrations", () => {
     await runMigrations(database);
     await runMigrations(database);
 
-    expect(appliedMigrations).toEqual(new Set(["001_init.sql"]));
+    expect(appliedMigrations).toEqual(new Set(["001_init.sql", "002_hardening.sql"]));
     expect(statements.filter((sql) => sql.startsWith("CREATE TABLE users"))).toHaveLength(1);
-    expect(statements.filter((sql) => sql === "BEGIN")).toHaveLength(1);
-    expect(statements.filter((sql) => sql === "COMMIT")).toHaveLength(1);
+    expect(statements.filter((sql) => sql === "BEGIN")).toHaveLength(2);
+    expect(statements.filter((sql) => sql === "COMMIT")).toHaveLength(2);
   });
 });

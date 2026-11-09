@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../app.js";
 import { config } from "../config/env.js";
-import { pool } from "../db/pool.js";
+import { migrationPool, pool } from "../db/pool.js";
 import { runMigrations } from "../db/migrate.js";
 import { insertReading } from "../../test/helpers/readings.js";
 
@@ -24,11 +24,11 @@ let userBId;
 let userAToken;
 
 beforeAll(async () => {
-  await runMigrations(pool);
+  await runMigrations(migrationPool);
 });
 
 beforeEach(async () => {
-  await pool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   const result = await pool.query(
     `INSERT INTO users (name, email, password_hash)
      VALUES
@@ -41,8 +41,9 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+  await migrationPool.query("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
   await pool.end();
+  await migrationPool.end();
 });
 
 describe("GET /reports/daily", () => {
