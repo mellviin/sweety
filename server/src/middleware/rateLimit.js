@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { config } from "../config/env.js";
+import { recordSecurityEvent, getSafeRequestIp } from "../services/securityEventService.js";
+import { logger, maskEmail } from "../utils/logger.js";
 
 const failedLoginAttempts = new Map();
 const defaultRateLimitMessage = "Too many requests. Please try again later.";
@@ -10,18 +12,39 @@ function isDisabledInTest() {
   return process.env.NODE_ENV === "test" && !config.rateLimitsEnabled;
 }
 
-function sendRateLimitResponse(request, response, windowMs) {
+async function sendRateLimitResponse(request, response, windowMs, limiter) {
   const resetTime = request.rateLimit?.resetTime?.getTime();
   const retryAfterSeconds = resetTime
     ? Math.max(1, Math.ceil((resetTime - Date.now()) / 1000))
     : Math.max(1, Math.ceil(windowMs / 1000));
 
+  await recordLimitEvent(request, limiter);
   response.setHeader("Retry-After", String(retryAfterSeconds));
   response.status(429).json({
     error: {
       field: null,
       message: defaultRateLimitMessage,
     },
+  });
+}
+
+async function recordLimitEvent(request, limiter) {
+  try {
+    await recordSecurityEvent(request, "rate_limited");
+  } catch {
+    logger.error("security_event_write_failed", {
+      request_id: request.requestId,
+      event_type: "rate_limited",
+    });
+  }
+
+  logger.warn("request_rate_limited", {
+    request_id: request.requestId,
+    limiter,
+    ip: getSafeRequestIp(request),
+    email: limiter === "login_lockout"
+      ? maskEmail(request.body?.email)
+      : undefined,
   });
 }
 
@@ -35,6 +58,7 @@ export const globalRateLimiter = rateLimit({
     request,
     response,
     config.globalRateLimitWindowMs,
+    "global",
   ),
 });
 
@@ -48,6 +72,7 @@ export const authRateLimiter = rateLimit({
     request,
     response,
     config.authRateLimitWindowMs,
+    "auth",
   ),
 });
 
@@ -62,6 +87,7 @@ export const readingWriteRateLimiter = rateLimit({
     request,
     response,
     config.readingWriteRateLimitWindowMs,
+    "reading_write",
   ),
 });
 
@@ -85,12 +111,19 @@ export function failedLoginRateLimiter(request, response, next) {
       1,
       Math.ceil((recentAttempts[0].createdAt + windowMs - now) / 1000),
     );
-    response.setHeader("Retry-After", String(retryAfterSeconds));
-    return response.status(429).json({
-      error: {
-        field: null,
-        message: defaultRateLimitMessage,
-      },
+    return recordLimitEvent(request, "login_lockout").then(() => {
+      logger.warn("auth_login_lockout", {
+        request_id: request.requestId,
+        email: maskEmail(request.body.email),
+        ip: getSafeRequestIp(request),
+      });
+      response.setHeader("Retry-After", String(retryAfterSeconds));
+      response.status(429).json({
+        error: {
+          field: null,
+          message: defaultRateLimitMessage,
+        },
+      });
     });
   }
 

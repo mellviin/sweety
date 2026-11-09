@@ -25,6 +25,25 @@ test("the app database role cannot perform administrative actions", async () => 
     });
     await expect(client.query("SELECT count(*) FROM pg_shadow"))
       .rejects.toMatchObject({ code: "42501" });
+
+    const eventInsert = await client.query(
+      `INSERT INTO security_events (event_type)
+       VALUES ('login_failed')
+       RETURNING id`,
+    );
+    expect(eventInsert.rowCount).toBe(1);
+    await client.query(
+      "SELECT id, event_type FROM security_events WHERE id = $1",
+      [eventInsert.rows[0].id],
+    );
+    await expect(client.query(
+      "UPDATE security_events SET event_type = 'login_success' WHERE id = $1",
+      [eventInsert.rows[0].id],
+    )).rejects.toMatchObject({ code: "42501" });
+    await expect(client.query(
+      "DELETE FROM security_events WHERE id = $1",
+      [eventInsert.rows[0].id],
+    )).rejects.toMatchObject({ code: "42501" });
   } finally {
     client.release();
   }

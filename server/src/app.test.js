@@ -4,6 +4,7 @@ import request from "supertest";
 import app, { createApp } from "./app.js";
 import { config } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { createLogger } from "./utils/logger.js";
 
 describe("API app", () => {
   test("GET /health returns a healthy status", async () => {
@@ -11,6 +12,48 @@ describe("API app", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: "ok" });
+  });
+
+  test("returns a supplied request id and generates one when absent", async () => {
+    const supplied = await request(app)
+      .get("/health")
+      .set("X-Request-Id", "step7.request-id");
+    const generated = await request(app).get("/health");
+
+    expect(supplied.headers["x-request-id"]).toBe("step7.request-id");
+    expect(generated.headers["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  test("newline injection in an email is omitted from validation logs", async () => {
+    const loggedLines = [];
+    const write = jest.spyOn(process.stdout, "write")
+      .mockImplementation((line) => {
+        loggedLines.push(String(line));
+        return true;
+      });
+
+    try {
+      const response = await request(app)
+        .post("/auth/login")
+        .send({
+          email: "attacker@example.com\nINJECTED",
+          password: "not-a-real-password",
+        });
+
+      expect(response.status).toBe(400);
+      const output = loggedLines.join("");
+      expect(output).not.toContain("attacker");
+      expect(output).not.toContain("INJECTED");
+      expect(output.trim().split("\n").map((line) => JSON.parse(line)))
+        .toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            event: "validation_rejected",
+            field: "email",
+          }),
+        ]));
+    } finally {
+      write.mockRestore();
+    }
   });
 
   test("sets security headers and removes X-Powered-By", async () => {
@@ -138,13 +181,20 @@ describe("API app", () => {
   test("unexpected production errors are logged without exposing details", async () => {
     const testApp = express();
     const previousEnvironment = process.env.NODE_ENV;
-    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    const loggedLines = [];
+    const testLogger = createLogger((line) => loggedLines.push(line));
     process.env.NODE_ENV = "production";
 
     testApp.get("/failure", () => {
       throw new Error("private diagnostic detail");
     });
-    testApp.use(errorHandler);
+    testApp.use((error, req, res, next) => {
+      testLogger.error("request_failed", {
+        request_id: req.requestId,
+        status: 500,
+      });
+      errorHandler(error, req, res, next);
+    });
 
     try {
       const response = await request(testApp).get("/failure");
@@ -154,10 +204,12 @@ describe("API app", () => {
         error: { field: null, message: "Internal server error" },
       });
       expect(JSON.stringify(response.body)).not.toContain("private diagnostic detail");
-      expect(consoleError).toHaveBeenCalled();
+      expect(JSON.parse(loggedLines[0])).toMatchObject({
+        event: "request_failed",
+        status: 500,
+      });
     } finally {
       process.env.NODE_ENV = previousEnvironment;
-      consoleError.mockRestore();
     }
   });
 

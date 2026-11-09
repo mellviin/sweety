@@ -8,6 +8,7 @@ export function validateRequest(request, _response, next) {
   }
 
   const [firstError] = errors.array();
+  request.validationField = firstError.path ?? null;
   const error = new Error(firstError.msg);
   error.status = 400;
   error.field = firstError.path ?? null;

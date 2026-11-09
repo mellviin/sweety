@@ -1,10 +1,12 @@
+import { logger } from "../utils/logger.js";
+
 export function notFoundHandler(_request, _response, next) {
   const error = new Error("Route not found");
   error.status = 404;
   next(error);
 }
 
-export function errorHandler(error, _request, response, _next) {
+export function errorHandler(error, request, response, _next) {
   const isMalformedJson = error.type === "entity.parse.failed";
   const isOversizedBody = error.type === "entity.too.large";
   const status = isMalformedJson
@@ -22,12 +24,18 @@ export function errorHandler(error, _request, response, _next) {
       ? "Internal server error"
       : error.message;
 
+  if (status === 400) {
+    logger.warn("validation_rejected", {
+      request_id: request.requestId,
+      field: request.validationField ?? error.field ?? null,
+    });
+  }
+
   if (status >= 500) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("Unexpected request error.");
-    } else {
-      console.error("Unexpected request error:", error);
-    }
+    logger.error("request_failed", {
+      request_id: request.requestId,
+      status,
+    });
   }
 
   const errorBody = {

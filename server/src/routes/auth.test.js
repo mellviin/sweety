@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import { jest } from "@jest/globals";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../app.js";
@@ -188,6 +189,52 @@ describe("POST /auth/login", () => {
     expect(typeof response.body.token).toBe("string");
   });
 
+  test("login success logs never contain the password or issued token", async () => {
+    const loggedLines = [];
+    const write = jest.spyOn(process.stdout, "write")
+      .mockImplementation((line) => {
+        loggedLines.push(String(line));
+        return true;
+      });
+
+    try {
+      const response = await request(app)
+        .post("/auth/login")
+        .send({ email: userInput.email, password: userInput.password });
+      const output = loggedLines.join("");
+
+      expect(response.status).toBe(200);
+      expect(output).not.toContain(userInput.password);
+      expect(output).not.toContain(response.body.token);
+      expect(output).toContain("s***@example.com");
+    } finally {
+      write.mockRestore();
+    }
+  });
+
+  test("a failed login records a security event without credentials", async () => {
+    const response = await request(app)
+      .post("/auth/login")
+      .set("X-Request-Id", "failed-login-event")
+      .set("User-Agent", "Security test agent")
+      .send({ email: userInput.email, password: "wrong-password" });
+    const result = await pool.query(
+      `SELECT event_type, user_id, ip, user_agent
+       FROM security_events
+       WHERE event_type = 'login_failed'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+    );
+
+    expect(response.status).toBe(401);
+    expect(result.rows[0]).toMatchObject({
+      event_type: "login_failed",
+      user_id: null,
+      ip: expect.any(String),
+      user_agent: "Security test agent",
+    });
+  });
+
   test.each([
     ["wrong password", "different-password"],
     ["unknown email", "unknown@example.com"],
@@ -324,6 +371,9 @@ describe("POST /auth/login", () => {
     test("the sixth failed login is limited, but another email is unaffected", async () => {
       const email = `blocked-${Date.now()}@example.com`;
       const failures = [];
+      const eventCountBefore = await pool.query(
+        "SELECT count(*)::int AS count FROM security_events WHERE event_type = 'rate_limited'",
+      );
 
       for (let attempt = 0; attempt < 5; attempt += 1) {
         failures.push(await request(app)
@@ -333,6 +383,7 @@ describe("POST /auth/login", () => {
 
       const blocked = await request(app)
         .post("/auth/login")
+        .set("X-Request-Id", "login-lockout-event")
         .send({ email, password: "wrong-password" });
       const otherEmail = await request(app)
         .post("/auth/login")
@@ -349,6 +400,10 @@ describe("POST /auth/login", () => {
       );
       expect(otherEmail.status).toBe(401);
       expect(otherEmail.body.error.message).toBe("Invalid email or password.");
+      const eventCountAfter = await pool.query(
+        "SELECT count(*)::int AS count FROM security_events WHERE event_type = 'rate_limited'",
+      );
+      expect(eventCountAfter.rows[0].count).toBe(eventCountBefore.rows[0].count + 1);
     });
 
     test("failed-login limit resets after its configured window", async () => {

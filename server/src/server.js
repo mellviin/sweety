@@ -5,13 +5,14 @@ import {
   assertJwtSecret,
   config,
 } from "./config/env.js";
+import { logger } from "./utils/logger.js";
 
 let configurationValid = true;
 try {
   assertDatabaseUrl();
   assertJwtSecret();
 } catch (error) {
-  console.error(`Server configuration error: ${error.message}`);
+  logger.error("server_configuration_error", { reason: error.message });
   configurationValid = false;
   process.exitCode = 1;
 }
@@ -22,6 +23,6 @@ if (configurationValid) {
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
   server.listen(config.port, () => {
-    console.info(`Sweety API listening on port ${config.port}`);
+    logger.info("server_listening", { port: config.port });
   });
 }

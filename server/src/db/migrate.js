@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { getMigrationPool } from "./pool.js";
+import { logger } from "../utils/logger.js";
 
 const migrationsDirectory = join(dirname(fileURLToPath(import.meta.url)), "migrations");
 
@@ -56,7 +57,7 @@ export async function runMigrations(database = getMigrationPool()) {
           [file],
         );
         await client.query("COMMIT");
-        console.info(`Applied migration ${file}`);
+        logger.info("migration_applied");
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -72,8 +73,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     migrationPool = getMigrationPool();
     await runMigrations(migrationPool);
-  } catch (error) {
-    console.error("Database migration failed:", error);
+  } catch {
+    logger.error("database_migration_failed");
     process.exitCode = 1;
   } finally {
     if (migrationPool) {

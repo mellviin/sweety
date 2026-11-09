@@ -11,7 +11,9 @@ export function strictFields(location, allowedFields) {
       return next(invalidRequestError());
     }
 
-    if (Object.keys(fields).some((field) => !allowed.has(field))) {
+    const unknownField = Object.keys(fields).find((field) => !allowed.has(field));
+    if (unknownField !== undefined) {
+      request.validationField = unknownField;
       return next(invalidRequestError());
     }
 

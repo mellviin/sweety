@@ -82,7 +82,9 @@ test.each([
   );
 
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain(`Server configuration error: ${message}`);
+  expect(result.stdout).toContain('"event":"server_configuration_error"');
+  expect(result.stdout).toContain(`"reason":"${message}"`);
+  expect(result.stderr).not.toContain("Server configuration error");
   expect(result.stderr).not.toContain("Invalid URL");
   expect(result.stderr).not.toContain("TypeError");
 });

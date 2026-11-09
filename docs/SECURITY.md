@@ -12,6 +12,7 @@
 | Weak/reused passwords, login enumeration, forged/stale tokens, and persistent compromised sessions | Enforce the local common-password policy, compare a dummy bcrypt hash for unknown users, require HS256 plus issuer/audience/expiry, and invalidate tokens with a database token version on logout/password change. | `server/src/services/authService.js`, `server/src/services/passwordPolicy.js`, `server/src/middleware/auth.js`, `server/src/db/migrations/003_auth_hardening.sql` | `server/src/routes/auth.test.js` |
 | Cross-user reading access, mass assignment, malformed inputs, and SQL injection | Scope reading/report queries to the verified user ID, reject unknown request fields (including `user_id`/`userId`), validate scalar IDs/dates/pagination, and use static SQL with parameterized values. | `server/src/services/readingService.js`, `server/src/services/reportService.js`, `server/src/middleware/strictFields.js`, `server/src/db/seed.js` | `server/src/routes/readings.test.js`, `server/src/routes/reports.test.js`, `server/src/routes/auth.test.js`, `server/src/security/sqlQuerySafety.test.js` |
 | Persistent exposure of bearer tokens and client-side script injection | Keep the Authorization-header model, store the token in `sessionStorage`, clear it on logout and every 401, and disallow dangerous React HTML insertion with ESLint and CSP. | `client/src/api/client.js`, `client/src/context/AuthContext.jsx`, `client/eslint.config.js`, `client/index.html`, `client/vite.config.js` | `client/src/api/client.test.js`, `client/src/App.test.jsx` |
+| Sensitive data leakage or forged log lines, and lack of security-event auditability | Emit JSON logs from a strict field allow-list, sanitize control characters and mask emails, attach a validated request ID, and persist limited auth/rate-limit events in an app-role INSERT/SELECT-only table. | `server/src/utils/logger.js`, `server/src/middleware/requestContext.js`, `server/src/services/securityEventService.js`, `server/src/db/migrations/004_security_events.sql` | `server/src/app.test.js`, `server/src/routes/auth.test.js`, `server/src/db/roles.test.js` |
 
 ### Browser security headers
 
@@ -33,6 +34,7 @@ If the API is served from a separate origin, add only that exact HTTPS origin to
 - Registration deliberately retains its assignment-required 409 duplicate-email response, which reveals whether an email is registered; mitigating this enumeration channel would require changing that agreed API behavior.
 - Request schemas reject unknown body and query fields with 400; clients must not send extra fields such as `user_id` or `userId`.
 - The bearer token remains accessible to same-origin JavaScript in `sessionStorage`; session storage reduces persistence but does not prevent theft by a successful XSS.
+- Security-event records include IP addresses and user-agent strings; establish and enforce an operational retention period appropriate to the deployment.
 
 ## What I'd do next
 

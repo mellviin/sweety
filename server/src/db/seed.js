@@ -7,6 +7,7 @@ import {
   previousMonthRange,
   todayInTimezone,
 } from "../utils/dates.js";
+import { logger } from "../utils/logger.js";
 
 const demoUser = {
   name: "Demo User",
@@ -206,13 +207,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     migrationPool = getMigrationPool();
     await runMigrations(migrationPool);
-    const result = await seedDemoData();
-    console.info(
-      `Seeded ${result.readingCount} readings from ${result.from} to ${result.to}.`,
-    );
-    console.info(`Demo login: ${result.email} / ${result.password}`);
-  } catch (error) {
-    console.error("Database seed failed:", error);
+    await seedDemoData();
+    logger.info("demo_data_seeded");
+  } catch {
+    logger.error("database_seed_failed");
     process.exitCode = 1;
   } finally {
     await pool.end();

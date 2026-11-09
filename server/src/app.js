@@ -9,6 +9,7 @@ import {
   requireJsonContentType,
 } from "./middleware/httpHardening.js";
 import { strictFields } from "./middleware/strictFields.js";
+import { requestContext } from "./middleware/requestContext.js";
 import authRouter from "./routes/auth.js";
 import reportsRouter from "./routes/reports.js";
 import readingsRouter from "./routes/readings.js";
@@ -22,6 +23,7 @@ export function createApp() {
     .map((origin) => origin.trim())
     .filter((origin) => origin && origin !== "*");
 
+  app.use(requestContext);
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxy);
   app.use(helmet({

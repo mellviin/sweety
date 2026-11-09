@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import { config } from "../config/env.js";
 import { pool } from "../db/pool.js";
+import { getSafeRequestIp } from "../services/securityEventService.js";
+import { logger } from "../utils/logger.js";
 
 export async function authenticateToken(request, response, next) {
   const authorization = request.get("authorization");
@@ -9,7 +11,7 @@ export async function authenticateToken(request, response, next) {
     : null;
 
   if (!token) {
-    return sendLoginRequired(response);
+    return sendLoginRequired(request, response);
   }
 
   try {
@@ -27,7 +29,7 @@ export async function authenticateToken(request, response, next) {
       || !Number.isInteger(tokenVersion)
       || tokenVersion < 0
     ) {
-      return sendLoginRequired(response);
+      return sendLoginRequired(request, response);
     }
 
     const result = await pool.query(
@@ -38,7 +40,7 @@ export async function authenticateToken(request, response, next) {
       result.rowCount !== 1
       || result.rows[0].token_version !== tokenVersion
     ) {
-      return sendLoginRequired(response);
+      return sendLoginRequired(request, response);
     }
 
     request.user = { id: userId };
@@ -49,14 +51,18 @@ export async function authenticateToken(request, response, next) {
       || error instanceof jwt.TokenExpiredError
       || error instanceof jwt.NotBeforeError
     ) {
-      return sendLoginRequired(response);
+      return sendLoginRequired(request, response);
     }
 
     return next(error);
   }
 }
 
-function sendLoginRequired(response) {
+function sendLoginRequired(request, response) {
+  logger.warn("auth_token_rejected", {
+    request_id: request.requestId,
+    ip: getSafeRequestIp(request),
+  });
   return response.status(401).json({
     error: { field: null, message: "Please log in to continue." },
   });
