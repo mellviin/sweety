@@ -48,6 +48,49 @@ afterAll(async () => {
 });
 
 describe("POST /readings", () => {
+  test("parallel writes never exceed four readings for a user and date", async () => {
+    const registration = await request(app)
+      .post("/auth/register")
+      .send({
+        name: "Parallel User",
+        email: "parallel.user@example.com",
+        password: "correct-horse-battery",
+      });
+    const registeredUserId = registration.body.user.id;
+    const readings = slots.flatMap((slot, slotIndex) => [
+      { date: today, slot, value: 120 + slotIndex },
+      { date: today, slot, value: 130 + slotIndex },
+    ]);
+
+    expect(registration.status).toBe(201);
+    const responses = await Promise.all(
+      readings.map((reading) => request(app)
+        .post("/readings")
+        .set(authHeader(registration.body.token))
+        .send(reading)),
+    );
+    const savedReadings = await pool.query(
+      `SELECT id
+       FROM readings
+       WHERE user_id = $1 AND reading_date = $2`,
+      [registeredUserId, today],
+    );
+    const conflicts = responses.filter((response) => response.status === 409);
+
+    expect(savedReadings.rows).toHaveLength(4);
+    expect(responses.filter((response) => response.status === 201)).toHaveLength(4);
+    expect(conflicts).toHaveLength(4);
+    expect(responses.every((response) => response.status !== 500)).toBe(true);
+    for (const response of conflicts) {
+      expect(response.body).toEqual({
+        error: {
+          field: expect.stringMatching(/^(date|slot)$/),
+          message: expect.any(String),
+        },
+      });
+    }
+  });
+
   test("write limits apply per authenticated user and return Retry-After", async () => {
     const previousEnabled = config.rateLimitsEnabled;
     const previousLimit = config.readingWriteRateLimitMax;
@@ -353,6 +396,47 @@ describe("GET /readings", () => {
 });
 
 describe("reading ownership and updates", () => {
+  test("parallel date moves never leave more than four readings on any date", async () => {
+    await createReading({ date: today, slot: slots[0], value: 120 });
+    await createReading({ date: today, slot: slots[1], value: 121 });
+    const sourceDates = [previousDate(today), previousDate(previousDate(today))];
+    const movableReadings = [];
+
+    for (const [dateIndex, date] of sourceDates.entries()) {
+      for (const slot of slots.slice(2)) {
+        const created = await createReading({
+          date,
+          slot,
+          value: 130 + dateIndex,
+        });
+        movableReadings.push(created.body);
+      }
+    }
+
+    const responses = await Promise.all(
+      movableReadings.map((reading) => request(app)
+        .put(`/readings/${reading.id}`)
+        .set(authHeader())
+        .send({
+          date: today,
+          slot: reading.slot,
+          value: reading.value + 10,
+        })),
+    );
+    const countsByDate = await pool.query(
+      `SELECT reading_date, count(*)::int AS total
+       FROM readings
+       WHERE user_id = $1
+       GROUP BY reading_date`,
+      [Number(jwt.decode(userAToken).sub)],
+    );
+
+    expect(responses.every((response) => response.status !== 500)).toBe(true);
+    expect(responses.every((response) => [200, 409].includes(response.status)))
+      .toBe(true);
+    expect(countsByDate.rows.every((row) => row.total <= 4)).toBe(true);
+  });
+
   test("allows reading's owner to fetch a reading", async () => {
     const created = await createReading({ date: today, slot: slots[0], value: 120 });
     const response = await request(app)
